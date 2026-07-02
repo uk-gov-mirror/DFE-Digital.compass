@@ -18,5 +18,11 @@
   Actions = workDashboardHeaderActions
 })
 
+@{
+  var yourTasks = ViewBag.YourTasks as Compass.ViewModels.Dashboard.YourTasksViewModel
+    ?? new Compass.ViewModels.Dashboard.YourTasksViewModel();
+}
+@await Html.PartialAsync("~/Views/Modern/Shared/_YourTasks.cshtml", yourTasks)
+
  @await Html.PartialAsync("_DashboardMonthlyReporting")
 </div>

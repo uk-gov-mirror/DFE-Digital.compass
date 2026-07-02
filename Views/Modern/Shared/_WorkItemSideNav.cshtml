@@ -12,6 +12,8 @@
   var serviceRegisterLinkCount = ViewBag.WorkServiceRegisterLinkCount as int? ?? 0;
   var milestoneCount = ViewBag.WorkSideNavMilestoneCount as int? ?? 0;
   var monthlyUpdatesCount = ViewBag.WorkSideNavMonthlyUpdatesCount as int? ?? 0;
+  var weeklyUpdatesCount = ViewBag.WorkSideNavWeeklyUpdatesCount as int? ?? 0;
+  var showWeeklyReporting = ViewBag.ShowWeeklyReporting as bool? == true;
   var risksCount = ViewBag.WorkSideNavRisksCount as int? ?? 0;
   var issuesCount = ViewBag.WorkSideNavIssuesCount as int? ?? 0;
   var assumptionsCount = ViewBag.WorkSideNavAssumptionsCount as int? ?? 0;
@@ -46,6 +48,17 @@
         @await Html.PartialAsync("~/Views/Modern/Shared/_SideNavCountBadge.cshtml", strategicAlignmentCount)
       </a>
     </li>
+    @if (showWeeklyReporting)
+    {
+      <li class="dfe-f-side-navigation__item@(IsCurrent("weeklyupdates") ? " dfe-f-side-navigation__item--current" : "")">
+        <a class="dfe-f-side-navigation__link govuk-link govuk-link--no-visited-state dfe-f-side-navigation__link--with-badge"
+           href="@(detailUrl)#wd-weekly-updates"
+           id="wd-tab-weekly-updates">
+          <span class="dfe-f-side-navigation__link-text">Weekly updates</span>
+          @await Html.PartialAsync("~/Views/Modern/Shared/_SideNavCountBadge.cshtml", weeklyUpdatesCount)
+        </a>
+      </li>
+    }
     <li class="dfe-f-side-navigation__item@(IsCurrent("updates") ? " dfe-f-side-navigation__item--current" : "")">
       <a class="dfe-f-side-navigation__link govuk-link govuk-link--no-visited-state dfe-f-side-navigation__link--with-badge"
          href="@(detailUrl)#wd-updates"

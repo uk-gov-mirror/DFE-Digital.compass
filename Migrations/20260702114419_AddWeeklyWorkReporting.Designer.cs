@@ -4,6 +4,7 @@ using Compass.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Compass.Migrations
 {
     [DbContext(typeof(CompassDbContext))]
-    partial class CompassDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260702114419_AddWeeklyWorkReporting")]
+    partial class AddWeeklyWorkReporting
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -15149,9 +15152,6 @@ namespace Compass.Migrations
                     b.Property<int>("DueWeekOffset")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("FirstReportingPeriodStart")
-                        .HasColumnType("datetime2");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -15174,7 +15174,6 @@ namespace Compass.Migrations
                             Id = 1,
                             DueDayOfWeek = 5,
                             DueWeekOffset = 0,
-                            FirstReportingPeriodStart = new DateTime(2026, 6, 29, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsActive = true,
                             PeriodEndDayOfWeek = 5,
                             PeriodStartDayOfWeek = 1,

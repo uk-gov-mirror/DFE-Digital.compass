@@ -1,0 +1,123 @@
+@model Compass.ViewModels.Dashboard.YourTasksViewModel
+@using Compass.Services
+@{
+  var m = Model ?? new Compass.ViewModels.Dashboard.YourTasksViewModel();
+  var idPrefix = string.IsNullOrWhiteSpace(m.IdPrefix) ? "dashboard-task" : m.IdPrefix;
+
+  string Trunc(string? s, int n)
+  {
+    if (string.IsNullOrEmpty(s)) return "—";
+    return s.Length <= n ? s : s[..n] + "…";
+  }
+
+  string TaskStatusBadgeClass(string tag) => tag switch
+  {
+    _ when tag.Equals("Complete", StringComparison.OrdinalIgnoreCase) => "dfe-f-badge dfe-f-badge--small dfe-f-badge--green",
+    _ when tag.Equals("Late", StringComparison.OrdinalIgnoreCase) => "dfe-f-badge dfe-f-badge--small dfe-f-badge--red",
+    _ when tag.Contains("remaining", StringComparison.OrdinalIgnoreCase) => "dfe-f-badge dfe-f-badge--small dfe-f-badge--orange",
+    _ when tag.Contains("due", StringComparison.OrdinalIgnoreCase) => "dfe-f-badge dfe-f-badge--small dfe-f-badge--orange",
+    _ => "dfe-f-badge dfe-f-badge--small dfe-f-badge--orange"
+  };
+}
+
+<section class="modern-dashboard__section" aria-labelledby="@(idPrefix)-tasks-heading">
+  <h2 id="@(idPrefix)-tasks-heading" class="govuk-heading-m govuk-!-margin-top-0 modern-dashboard__section-heading">Your tasks</h2>
+  <p class="govuk-body modern-dashboard__section-desc">Prioritised actions across delivery, performance and RAID. Each row links to where you complete the task in Compass.</p>
+
+  @if (!m.HasAnyTasks)
+  {
+    <p class="govuk-body govuk-!-margin-bottom-0">No outstanding tasks from this list. Open <a class="govuk-link govuk-link--no-visited-state" href="@m.AllWorkHref">all work</a> for the full register.</p>
+  }
+  else
+  {
+    <ul class="govuk-task-list">
+      @if (m.ShowMonthlyReportingTask)
+      {
+        var monthlyStatusId = $"{idPrefix}-monthly-reporting-status";
+        var monthlyHintId = $"{idPrefix}-monthly-reporting-hint";
+        <li class="govuk-task-list__item govuk-task-list__item--with-link">
+          <div class="govuk-task-list__name-and-hint">
+            <a class="govuk-link govuk-task-list__link govuk-!-font-weight-bold govuk-link--no-visited-state" href="@m.MonthlyReportingHref" aria-describedby="@monthlyHintId @monthlyStatusId">
+              Submit monthly delivery updates (@m.ReportingPeriodLabel)
+            </a>
+            <div id="@monthlyHintId" class="govuk-task-list__hint">
+              @m.MonthlyReportingRemainingCount work item@(m.MonthlyReportingRemainingCount == 1 ? "" : "s") still need an update.
+            </div>
+          </div>
+          <div class="govuk-task-list__status" id="@monthlyStatusId">
+            <span class="@TaskStatusBadgeClass($"{m.MonthlyReportingRemainingCount} remaining")">@m.MonthlyReportingRemainingCount remaining</span>
+          </div>
+        </li>
+      }
+      @if (m.ShowPerformanceReturnsTask)
+      {
+        var perfStatusId = $"{idPrefix}-performance-returns-status";
+        var perfHintId = $"{idPrefix}-performance-returns-hint";
+        var perfCountLabel = $"{m.PerformanceReturnsDueCount} due";
+        <li class="govuk-task-list__item govuk-task-list__item--with-link">
+          <div class="govuk-task-list__name-and-hint">
+            <a class="govuk-link govuk-task-list__link govuk-!-font-weight-bold govuk-link--no-visited-state" href="@m.PerformanceCommissionsHref" aria-describedby="@perfHintId @perfStatusId">
+              Submit performance returns
+            </a>
+            <div id="@perfHintId" class="govuk-task-list__hint">
+              @m.PerformanceReturnsDueCount product return@(m.PerformanceReturnsDueCount == 1 ? "" : "s") still due across open commission periods.
+            </div>
+          </div>
+          <div class="govuk-task-list__status" id="@perfStatusId">
+            <span class="@TaskStatusBadgeClass(perfCountLabel)">@perfCountLabel</span>
+          </div>
+        </li>
+      }
+      @for (var ti = 0; ti < m.VisibleTasks.Count; ti++)
+      {
+        var t = m.VisibleTasks[ti];
+        var statusId = $"{idPrefix}-status-{ti + 1}";
+        var hintId = $"{idPrefix}-hint-{ti + 1}";
+        var statusBadgeClass = t.CompletionPercent is int pct
+          ? WorkBadgeCss.ServiceRegisterCompletionBadgeClass(pct)
+          : TaskStatusBadgeClass(t.StatusTag);
+        <li class="govuk-task-list__item govuk-task-list__item--with-link">
+          <div class="govuk-task-list__name-and-hint">
+            <a class="govuk-link govuk-task-list__link govuk-!-font-weight-bold govuk-link--no-visited-state" href="@t.Href" aria-describedby="@hintId @statusId">@Trunc(t.Title, 120)</a>
+            <div id="@hintId" class="govuk-task-list__hint">@Trunc(t.Hint, 120)</div>
+          </div>
+          <div class="govuk-task-list__status" id="@statusId">
+            <span class="@statusBadgeClass">@t.StatusTag</span>
+          </div>
+        </li>
+      }
+      @if (m.HiddenTasks.Count > 0)
+      {
+        <li class="govuk-task-list__item govuk-task-list__item--with-link">
+          <details class="govuk-details govuk-!-margin-bottom-0" data-module="govuk-details">
+            <summary class="govuk-details__summary">
+              <span class="govuk-details__summary-text">@m.HiddenTasks.Count more task@(m.HiddenTasks.Count == 1 ? "" : "s")</span>
+            </summary>
+            <div class="govuk-details__text govuk-!-margin-top-2 govuk-!-margin-bottom-0">
+              <ul class="govuk-task-list govuk-!-margin-bottom-0">
+                @for (var hi = 0; hi < m.HiddenTasks.Count; hi++)
+                {
+                  var t = m.HiddenTasks[hi];
+                  var statusId = $"{idPrefix}-hidden-status-{hi + 1}";
+                  var hintId = $"{idPrefix}-hidden-hint-{hi + 1}";
+                  var statusBadgeClass = t.CompletionPercent is int pct
+                    ? WorkBadgeCss.ServiceRegisterCompletionBadgeClass(pct)
+                    : TaskStatusBadgeClass(t.StatusTag);
+                  <li class="govuk-task-list__item govuk-task-list__item--with-link">
+                    <div class="govuk-task-list__name-and-hint">
+                      <a class="govuk-link govuk-task-list__link govuk-!-font-weight-bold govuk-link--no-visited-state" href="@t.Href" aria-describedby="@hintId @statusId">@Trunc(t.Title, 120)</a>
+                      <div id="@hintId" class="govuk-task-list__hint">@Trunc(t.Hint, 120)</div>
+                    </div>
+                    <div class="govuk-task-list__status" id="@statusId">
+                      <span class="@statusBadgeClass">@t.StatusTag</span>
+                    </div>
+                  </li>
+                }
+              </ul>
+            </div>
+          </details>
+        </li>
+      }
+    </ul>
+  }
+</section>

@@ -1,12 +1,9 @@
-@model Compass.Models.Modern.Work.MonthlyReportViewModel
+@model Compass.Models.Modern.Work.WeeklyReportViewModel
 @using Compass.Models.Modern.Work
 @{
-    ViewData["Title"] = $"Monthly update submission — {Model.PeriodLabel}";
+    ViewData["Title"] = $"Weekly update submission — {Model.PeriodLabel}";
     var isSubmitted = Model.IsSubmitted;
-    var lockedOutsideSubmissionWindow =
-        Model.UsesExplicitReportingPeriod &&
-        !Model.CanEditMonthlySubmission &&
-        !isSubmitted;
+    var lockedOutsideSubmissionWindow = !Model.CanEditWeeklySubmission && !isSubmitted;
     var isReadOnly = isSubmitted || lockedOutsideSubmissionWindow;
     var hasNonGreenRag = false;
     if (Model.RagStatusId.HasValue)
@@ -24,10 +21,11 @@
  <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Index", "ModernDashboard")">Home</a></li>
  <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Dashboard", "ModernWork")">Work</a></li>
  <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Detail", "ModernWork", new { id = Model.WorkItemId })">@(Model.WorkItemReference ?? Model.WorkItemTitle)</a></li>
- <li class="govuk-breadcrumbs__list-item" aria-current="page">Monthly report</li>
+ <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Detail", "ModernWork", new { id = Model.WorkItemId })#wd-weekly-updates">@(Model.WorkItemReference ?? Model.WorkItemTitle)</a></li>
+ <li class="govuk-breadcrumbs__list-item" aria-current="page">Weekly report</li>
 }
 
-<div id="sc-work-monthly-report" class="modern-work-page">
+<div id="sc-work-weekly-report" class="modern-work-page">
 @if (work != null)
 {
   @await Html.PartialAsync("_WorkItemChrome", work)
@@ -44,23 +42,23 @@
   </div>
   <div class="govuk-grid-column-three-quarters-from-desktop modern-work-detail-main">
 
-<h2 class="govuk-heading-l govuk-!-margin-top-0">Monthly update submission</h2>
+<h2 class="govuk-heading-l govuk-!-margin-top-0">Weekly update submission</h2>
 
-@if (TempData["MonthlyReportMessage"] is string monthlySuccess && !string.IsNullOrWhiteSpace(monthlySuccess))
+@if (TempData["WeeklyReportMessage"] is string weeklySuccess && !string.IsNullOrWhiteSpace(weeklySuccess))
 {
- <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="monthly-report-success-banner-title" data-module="govuk-notification-banner">
+ <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="weekly-report-success-banner-title" data-module="govuk-notification-banner">
  <div class="govuk-notification-banner__header">
- <h2 class="govuk-notification-banner__title" id="monthly-report-success-banner-title">Success</h2>
+ <h2 class="govuk-notification-banner__title" id="weekly-report-success-banner-title">Success</h2>
         </div>
- <div class="govuk-notification-banner__content"><p class="govuk-notification-banner__heading">@monthlySuccess</p></div>
+ <div class="govuk-notification-banner__content"><p class="govuk-notification-banner__heading">@weeklySuccess</p></div>
     </div>
 }
-@if (TempData["MonthlyReportError"] is string monthlyError && !string.IsNullOrWhiteSpace(monthlyError))
+@if (TempData["WeeklyReportError"] is string weeklyError && !string.IsNullOrWhiteSpace(weeklyError))
 {
  <div class="govuk-error-summary" data-module="govuk-error-summary">
         <div role="alert">
  <h2 class="govuk-error-summary__title">There is a problem</h2>
- <div class="govuk-error-summary__body"><p>@monthlyError</p></div>
+ <div class="govuk-error-summary__body"><p>@weeklyError</p></div>
         </div>
     </div>
 }
@@ -81,7 +79,7 @@
             <strong>Submitted</strong> on @Model.SubmittedAt?.ToString("d MMM yyyy 'at' HH:mm") by @(Model.SubmittedByName ?? "—")
             @if (Model.CanUnsubmit)
             {
-                <form method="post" action="@Url.Action("MonthlyReportUnsubmit", "ModernWork", new { id = Model.WorkItemId, year = Model.Year, month = Model.Month })" style="display:inline; margin-left:1rem;">
+                <form method="post" action="@Url.Action("WeeklyReportUnsubmit", "ModernWork", new { id = Model.WorkItemId, year = Model.IsoYear, week = Model.IsoWeek })" style="display:inline; margin-left:1rem;">
                     @Html.AntiForgeryToken()
  <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Unsubmit</button>
                 </form>
@@ -89,7 +87,7 @@
         </div>
 }
 
-        <form method="post" action="@Url.Action("MonthlyReportPost", "ModernWork", new { id = Model.WorkItemId, year = Model.Year, month = Model.Month })" novalidate>
+        <form method="post" action="@Url.Action("WeeklyReportPost", "ModernWork", new { id = Model.WorkItemId, year = Model.IsoYear, week = Model.IsoWeek })" novalidate>
             @Html.AntiForgeryToken()
 
  @if (!ViewData.ModelState.IsValid)
@@ -121,11 +119,11 @@
  <dt class="govuk-summary-list__key">Reporting period</dt>
  <dd class="govuk-summary-list__value">@Model.PeriodLabel</dd>
  </div>
- @if (Model.UsesExplicitReportingPeriod && Model.SubmissionOpens.HasValue)
+ @if (Model.SubmissionOpens != default)
  {
  <div class="govuk-summary-list__row">
  <dt class="govuk-summary-list__key">Opens</dt>
- <dd class="govuk-summary-list__value"><span class="dfe-f-u-tabular-numbers">@Model.SubmissionOpens.Value.ToString("ddd d MMM yyyy")</span></dd>
+ <dd class="govuk-summary-list__value"><span class="dfe-f-u-tabular-numbers">@Model.SubmissionOpens.ToString("ddd d MMM yyyy")</span></dd>
  </div>
  }
  <div class="govuk-summary-list__row">
@@ -134,9 +132,9 @@
  </div>
  </dl>
 
- @if (Model.PreviousMonthSubmission != null)
+ @if (Model.PreviousWeekSubmission != null)
  {
-   @await Html.PartialAsync("_MonthlyReportLastMonth", Model.PreviousMonthSubmission)
+   @await Html.PartialAsync("_WeeklyReportLastWeek", Model.PreviousWeekSubmission)
  }
 
  <h3 class="govuk-heading-m govuk-!-margin-top-6" id="monthly-report-people-heading">People</h3>
@@ -162,7 +160,7 @@
             </div>
 
  <div class="govuk-form-group @(Err("peopleNarrative") != null ? "govuk-form-group--error" : "")">
- <label class="govuk-label" for="peopleNarrative">Narrative on people this month</label>
+ <label class="govuk-label" for="peopleNarrative">Narrative on people this week</label>
  <div id="peopleNarrative-hint" class="govuk-hint">Include details of significant changes, moves, onboarding, offboarding.</div>
  @if (Err("peopleNarrative") != null)
  {
@@ -228,8 +226,8 @@
             </div>
 
  <div class="govuk-form-group @(Err("narrative") != null ? "govuk-form-group--error" : "")">
- <label class="govuk-label" for="narrative">Overall monthly update narrative</label>
- <div id="narrative-hint" class="govuk-hint">Summarise what has happened this month, key progress, blockers, and decisions needed.</div>
+ <label class="govuk-label" for="narrative">Overall weekly update narrative</label>
+ <div id="narrative-hint" class="govuk-hint">Summarise what has happened this week, key progress, blockers, and decisions needed.</div>
  @if (Err("narrative") != null)
  {
  <p id="narrative-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@Err("narrative")</p>
@@ -243,8 +241,8 @@
             @if (!isReadOnly)
             {
  <div class="dfe-c-button-group">
- <button type="submit" name="command" value="save" class="govuk-button monthly-report-save-draft" data-module="govuk-button">Save as draft</button>
- <button type="submit" name="command" value="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Submit monthly report</button>
+ <button type="submit" name="command" value="save" class="govuk-button weekly-report-save-draft" data-module="govuk-button">Save as draft</button>
+ <button type="submit" name="command" value="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Submit weekly report</button>
  <a class="govuk-link" href="@Url.Action("Detail", "ModernWork", new { id = Model.WorkItemId })">Cancel</a>
                 </div>
             }

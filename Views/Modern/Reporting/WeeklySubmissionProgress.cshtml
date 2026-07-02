@@ -1,0 +1,248 @@
+@using System.Linq
+@using System.Text.Json
+@using Compass.ViewModels
+@using Compass.ViewModels.Modern
+@model ModernWeeklySubmissionProgressViewModel
+@{
+  ViewData["Title"] = "Weekly submission progress";
+  var m = Model ?? new ModernWeeklySubmissionProgressViewModel();
+  var st = m.MonthlyUpdateStats;
+  var jsonOpts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+  var chartJson = JsonSerializer.Serialize(m.DailyProgress, jsonOpts);
+  var showSubmissionChart = m.DailyProgress.Count > 0;
+  var overallPct = st == null || st.TotalProjects == 0 ? 0m : Math.Round(100m * st.Submitted / st.TotalProjects, 1);
+  string MspNavUrl(int? y, int? mo, int? ba, int? dir) =>
+    Url.Action("WeeklySubmissionProgress", "ModernReporting", new { isoYear = y, isoWeek = mo, businessAreaId = ba, directorateId = dir }) ?? "#";
+  var periodToolbar = WeeklyReportPeriodToolbarViewModel.FromSubmissionProgress(
+    m,
+    Url.Action("WeeklySubmissionProgress", "ModernReporting") ?? "",
+    MspNavUrl);
+}
+
+@section Breadcrumbs {
+  <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Index", "ModernDashboard")">Home</a></li>
+  <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Dashboard", "ModernReporting")">Reporting</a></li>
+  <li class="govuk-breadcrumbs__list-item" aria-current="page">Weekly submission progress</li>
+}
+
+<div class="mr-dash">
+  @{
+    var ledeText = "Track weekly return submissions against the reporting window. Compare actual progress with the linear target for the period.";
+    var lede = await Html.PartialAsync("_GovukBodyParagraph", ledeText);
+  }
+  @await Html.PartialAsync("_ModernPageHeader", new ModernPageHeaderViewModel {
+    Caption = "Reporting",
+    Title = "Weekly submission progress",
+    Lede = lede
+  })
+
+  @if (TempData["ErrorMessage"] != null)
+  {
+    <div class="dfe-c-error-summary" role="alert" style="margin-bottom:1.5rem;">
+      <p class="dfe-c-body" style="margin:0;">@TempData["ErrorMessage"]</p>
+    </div>
+  }
+
+  @await Html.PartialAsync("_WeeklyReportPeriodToolbar", periodToolbar)
+
+  @if (st != null)
+  {
+    <section class="mr-section govuk-!-margin-bottom-4" aria-labelledby="msp-h-summary">
+      <h2 id="msp-h-summary" class="govuk-heading-m">Summary</h2>
+      <div class="dfe-f-card-grid">
+        <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey">
+          <p class="govuk-body-s dfe-f-stat-card__label">Work items in scope</p>
+          <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@st.TotalProjects</p>
+        </div>
+        <div class="dfe-f-stat-card dfe-f-stat-card--tint-green">
+          <p class="govuk-body-s dfe-f-stat-card__label">Submitted</p>
+          <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@st.Submitted</p>
+        </div>
+        <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey">
+          <p class="govuk-body-s dfe-f-stat-card__label">In progress</p>
+          <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@st.InProgress</p>
+        </div>
+        <div class="dfe-f-stat-card dfe-f-stat-card--tint-red">
+          <p class="govuk-body-s dfe-f-stat-card__label">Late</p>
+          <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@st.Late</p>
+        </div>
+        <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey">
+          <p class="govuk-body-s dfe-f-stat-card__label">Not started</p>
+          <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@st.NotStarted</p>
+        </div>
+        <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey">
+          <p class="govuk-body-s dfe-f-stat-card__label">Target today</p>
+          <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@m.ExpectedProgressPercentToday%</p>
+        </div>
+        <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey">
+          <p class="govuk-body-s dfe-f-stat-card__label">Actual completion</p>
+          <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@overallPct%</p>
+        </div>
+      </div>
+    </section>
+  }
+
+  <section class="mr-section govuk-!-margin-bottom-4" aria-labelledby="msp-h-directorate">
+    <h2 id="msp-h-directorate" class="govuk-heading-m">By directorate</h2>
+    <p class="govuk-body-s govuk-hint">Expand a directorate to see work items and submission status for @m.PeriodLabel. Target for today: <strong>@m.ExpectedProgressPercentToday%</strong>. Each work item is counted once (primary directorate).</p>
+    <div class="dfe-f-toggle-group govuk-!-margin-bottom-2" data-module="dfe-f-toggle-group">
+      <div class="dfe-f-toggle-group__controls govuk-body-s govuk-!-margin-bottom-2">
+        <button type="button" class="dfe-f-toggle-group__action" data-dfe-toggle-expand-all>Expand all</button>
+        <span class="dfe-f-toggle-group__separator" aria-hidden="true"> · </span>
+        <button type="button" class="dfe-f-toggle-group__action" data-dfe-toggle-collapse-all>Collapse all</button>
+      </div>
+      <div class="dfe-f-toggle-group__items">
+        @{ ViewData["ToggleIdPrefix"] = "msp-dir"; }
+        @await Html.PartialAsync("_MonthlySubmissionProgressGroupToggles", m.DirectorateLeague)
+      </div>
+    </div>
+  </section>
+
+  <section class="mr-section govuk-!-margin-bottom-4" aria-labelledby="msp-h-ba">
+    <h2 id="msp-h-ba" class="govuk-heading-m">By business area</h2>
+    <p class="govuk-body-s govuk-hint">Expand a business area to see work items and submission status for @m.PeriodLabel. Target for today: <strong>@m.ExpectedProgressPercentToday%</strong>.</p>
+    <div class="dfe-f-toggle-group govuk-!-margin-bottom-2" data-module="dfe-f-toggle-group">
+      <div class="dfe-f-toggle-group__controls govuk-body-s govuk-!-margin-bottom-2">
+        <button type="button" class="dfe-f-toggle-group__action" data-dfe-toggle-expand-all>Expand all</button>
+        <span class="dfe-f-toggle-group__separator" aria-hidden="true"> · </span>
+        <button type="button" class="dfe-f-toggle-group__action" data-dfe-toggle-collapse-all>Collapse all</button>
+      </div>
+      <div class="dfe-f-toggle-group__items">
+        @{ ViewData["ToggleIdPrefix"] = "msp-ba"; }
+        @await Html.PartialAsync("_MonthlySubmissionProgressGroupToggles", m.BusinessAreaLeague)
+      </div>
+    </div>
+  </section>
+
+  <section class="mr-section govuk-!-margin-bottom-4" aria-labelledby="msp-h-trend">
+    <h2 id="msp-h-trend" class="govuk-heading-m">Business area completion over the last 6 weeks</h2>
+    <p class="govuk-body-s govuk-hint">
+      Completion rate (submitted returns as a share of work items in scope) for each week ending at @m.PeriodLabel.
+      Each week shows +, − or = compared with the previous week (completion rate change of at least 3 percentage points).
+    </p>
+    @await Html.PartialAsync("_BusinessAreaSubmissionTrendTable", (m.TrendMonthColumns, m.BusinessAreaTrendRows))
+  </section>
+
+  <section class="mr-section govuk-!-margin-bottom-4" aria-labelledby="msp-h-chart">
+    <h2 id="msp-h-chart" class="govuk-heading-m">Submission progress over the window</h2>
+    <p class="govuk-body-s govuk-hint">Cumulative completion (%) compared with a linear target across the reporting window.</p>
+    @if (m.DailyProgress.Count == 0)
+    {
+      <p class="govuk-body dfe-c-text-muted">No submission window data for this period.</p>
+    }
+    else
+    {
+      <div class="msp-chart-wrap" style="position:relative;height:320px;max-width:100%;">
+        <canvas id="msp-submission-chart" aria-label="Cumulative weekly submission progress chart"></canvas>
+      </div>
+    }
+  </section>
+
+  <p class="govuk-body-s">
+    <a class="govuk-link govuk-link--no-visited-state" href="@Url.Action("WeeklyUpdate", "ModernReporting", new { isoYear = m.IsoYear, isoWeek = m.IsoWeek, businessAreaId = m.FilterBusinessAreaId, directorateId = m.FilterDirectorateId })">Open weekly report for @m.PeriodLabel</a>
+  </p>
+</div>
+
+<style>
+  .msp-chart-wrap { margin-bottom: 0.5rem; }
+  .msp-league__progress { min-width: 8rem; }
+  .msp-gap--ahead { color: #00703c; font-weight: 600; }
+  .msp-gap--behind { color: #d4351c; font-weight: 600; }
+  .msp-mom { font-weight: 700; font-size: 0.875rem; }
+  .msp-mom--up { color: #00703c; }
+  .msp-mom--down { color: #d4351c; }
+  .msp-mom--flat { color: #505a5f; }
+  .mr-toggle-panel__meta {
+    margin-left: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .msp-group-toggles .dfe-f-toggle__button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+  .msp-group-toggles .dfe-f-toggle__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: left;
+  }
+</style>
+
+@if (showSubmissionChart)
+{
+  @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" nonce="@Context.Items["Nonce"]"></script>
+    <script nonce="@Context.Items["Nonce"]">
+      (function () {
+        var points = @Html.Raw(chartJson);
+        var el = document.getElementById('msp-submission-chart');
+        if (!el || typeof Chart === 'undefined' || !points.length) return;
+
+        new Chart(el.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: points.map(function (p) { return p.label; }),
+            datasets: [
+              {
+                label: 'Actual (cumulative)',
+                data: points.map(function (p) { return p.actualCompletionPercent; }),
+                borderColor: '#00703c',
+                backgroundColor: 'rgba(0, 112, 60, 0.08)',
+                tension: 0,
+                fill: true,
+                pointRadius: 2,
+                pointHoverRadius: 5
+              },
+              {
+                label: 'Target (linear)',
+                data: points.map(function (p) { return p.expectedCompletionPercent; }),
+                borderColor: '#505a5f',
+                borderDash: [6, 4],
+                backgroundColor: 'transparent',
+                tension: 0,
+                fill: false,
+                pointRadius: 0,
+                pointHoverRadius: 4
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { position: 'bottom' },
+              tooltip: {
+                callbacks: {
+                  label: function (ctx) {
+                    var pt = points[ctx.dataIndex];
+                    if (!pt) return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + '%';
+                    var count = ctx.datasetIndex === 0 ? pt.actualCumulative : Math.round(pt.expectedCumulative);
+                    return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + '% (' + count + ' of ' + pt.totalInScope + ')';
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                  callback: function (v) { return v + '%'; }
+                },
+                title: { display: true, text: 'Cumulative completion' }
+              },
+              x: {
+                ticks: { maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 16 }
+              }
+            }
+          }
+        });
+      })();
+    </script>
+  }
+}

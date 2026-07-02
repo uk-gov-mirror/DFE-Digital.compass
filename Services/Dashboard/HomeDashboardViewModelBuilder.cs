@@ -17,9 +17,6 @@ namespace Compass.Services.Dashboard;
 
 public class HomeDashboardViewModelBuilder : IHomeDashboardViewModelBuilder
 {
-    private static bool IsOpenForSubmissionWindow(Commission commission, DateTime now) =>
-        commission.IsActive && now >= commission.OpenDate && now <= commission.DueDate.AddDays(1);
-
     private readonly ILogger<HomeDashboardViewModelBuilder> _logger;
     private readonly IProductsApiService _productsApiService;
     private readonly IReturnStatusService _returnStatusService;
@@ -27,6 +24,7 @@ public class HomeDashboardViewModelBuilder : IHomeDashboardViewModelBuilder
     private readonly CompassDbContext _context;
     private readonly IWebHostEnvironment _environment;
     private readonly IConfiguration _configuration;
+    private readonly IYourTasksViewModelBuilder _yourTasksBuilder;
 
     public HomeDashboardViewModelBuilder(
         ILogger<HomeDashboardViewModelBuilder> logger,
@@ -35,7 +33,8 @@ public class HomeDashboardViewModelBuilder : IHomeDashboardViewModelBuilder
         IMonthlyUpdateService monthlyUpdateService,
         CompassDbContext context,
         IWebHostEnvironment environment,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IYourTasksViewModelBuilder yourTasksBuilder)
     {
         _logger = logger;
         _productsApiService = productsApiService;
@@ -44,6 +43,7 @@ public class HomeDashboardViewModelBuilder : IHomeDashboardViewModelBuilder
         _context = context;
         _environment = environment;
         _configuration = configuration;
+        _yourTasksBuilder = yourTasksBuilder;
     }
 
     public async Task<UserPreference> GetOrCreateDashboardPreferenceAsync(User user)
@@ -74,7 +74,7 @@ public class HomeDashboardViewModelBuilder : IHomeDashboardViewModelBuilder
         return preference;
     }
 
-    public async Task<HomeDashboardViewModel> BuildDashboardViewModelAsync(User currentUser, string userEmail, UserPreference preference, IUrlHelper url, HttpContext httpContext)
+    public async Task<HomeDashboardViewModel> BuildDashboardViewModelAsync(User currentUser, string userEmail, UserPreference preference, IUrlHelper url, HttpContext httpContext, bool showRaidIssues = true)
     {
         var myProjects = await _context.Projects
             .Where(p => !p.IsDeleted && p.Status == "Active" && (
@@ -244,57 +244,8 @@ public class HomeDashboardViewModelBuilder : IHomeDashboardViewModelBuilder
         var monthlyReportingRemainingCount = projectsNeedingMonthlyUpdates.Count;
 
         // Calculate products needing commission reporting
-        var productsNeedingCommissionReporting = new List<(ProductDto Product, Commission Commission, CommissionSubmissionStatus Status, DateTime DueDate)>();
-        var activeCommissions = await _context.Commissions
-            .Where(c => c.IsActive && c.OpenDate <= now)
-            .OrderByDescending(c => c.DueDate)
-            .ToListAsync();
-
-        foreach (var commission in activeCommissions)
-        {
-            if (!IsOpenForSubmissionWindow(commission, now))
-                continue;
-
-            // Get user's products for this commission
-            var userProductDocumentIds = myProducts
-                .Where(p => !string.IsNullOrEmpty(p.DocumentId) && 
-                           p.State != null && 
-                           !p.State.Equals("Decommissioned", StringComparison.OrdinalIgnoreCase) &&
-                           !p.State.Equals("Decommissioning", StringComparison.OrdinalIgnoreCase) &&
-                           p.PublishedAt.HasValue)
-                .Select(p => p.DocumentId!)
-                .ToList();
-
-            if (!userProductDocumentIds.Any())
-                continue;
-
-            // Get existing submissions for user's products
-            var existingSubmissions = await _context.CommissionSubmissions
-                .Where(cs => cs.CommissionId == commission.Id && 
-                            userProductDocumentIds.Contains(cs.ProductDocumentId))
-                .ToDictionaryAsync(cs => cs.ProductDocumentId, cs => cs);
-
-            // Check each user product
-            foreach (var product in myProducts.Where(p => userProductDocumentIds.Contains(p.DocumentId ?? "")))
-            {
-                var documentId = product.DocumentId ?? "";
-                if (string.IsNullOrEmpty(documentId))
-                    continue;
-
-                var submission = existingSubmissions.GetValueOrDefault(documentId);
-                var status = submission?.Status ?? CommissionSubmissionStatus.NotStarted;
-
-                if (status == CommissionSubmissionStatus.Submitted)
-                    continue;
-
-                var isPastDue = now > commission.DueDate;
-                var finalStatus = isPastDue
-                    ? CommissionSubmissionStatus.Late
-                    : status;
-
-                productsNeedingCommissionReporting.Add((product, commission, finalStatus, commission.DueDate));
-            }
-        }
+        var productsNeedingCommissionReporting =
+            await _yourTasksBuilder.LoadProductsNeedingCommissionReportingAsync(myProducts);
 
         var assignedActions = await _context.Actions
             .Include(a => a.Project)
@@ -565,6 +516,28 @@ public class HomeDashboardViewModelBuilder : IHomeDashboardViewModelBuilder
             "Dashboard VM built for {Email}: {Projects} projects, {Products} products, {Milestones} milestones, {Issues} issues, {Actions} assigned actions, {Standards} DDT standards",
             userEmail, myProjects.Count, myProducts.Count, allActiveMilestones.Count, allActiveIssues.Count, assignedActions.Count, myDdtStandards.Count);
 
+        var yourTasks = _yourTasksBuilder.Build(new YourTasksBuildInput
+        {
+            MyProjects = myProjects,
+            OverdueMilestones = overdueMilestones,
+            MilestonesDueThisWeek = milestonesDueThisWeek,
+            HighPriorityIssues = highPriorityIssues,
+            AssignedActions = assignedActions,
+            ShowRaidIssues = showRaidIssues,
+            MonthlyReportingWindowOpen = monthlyReportingWindowOpen,
+            MonthlyReportingRemainingCount = monthlyReportingRemainingCount,
+            ReportingPeriodLabel = applicableMonthlyUpdatePeriodLabel,
+            PerformanceReturnsDueCount = productsNeedingCommissionReporting.Count,
+            Links = new YourTasksLinkOptions
+            {
+                MonthlyReportingHref = url.Action("Dashboard", "ModernWork") ?? "/modern/work/dashboard",
+                PerformanceCommissionsHref = url.Action("Index", "ModernPerformance") ?? "/modern/performance/commissions",
+                AllWorkHref = url.Action("AllWork", "ModernWork") ?? "/modern/work/all"
+            },
+            IdPrefix = "dashboard-task",
+            Url = url
+        });
+
         return new HomeDashboardViewModel
         {
             CurrentUser = currentUser,
@@ -599,6 +572,7 @@ public class HomeDashboardViewModelBuilder : IHomeDashboardViewModelBuilder
             MonthlyReportingRemainingCount = monthlyReportingRemainingCount,
             MonthlyUpdateStatusByProjectId = monthlyUpdateStatusByProjectId,
             ProductsNeedingCommissionReporting = productsNeedingCommissionReporting,
+            YourTasks = yourTasks,
             LeadershipAssignments = leadershipAssignments,
             LeadershipBusinessAreas = leadershipBusinessAreas,
             HighestLeadershipRole = highestRole,

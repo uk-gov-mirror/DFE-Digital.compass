@@ -246,6 +246,9 @@ public partial class CompassDbContext : DbContext
     public DbSet<MonthlyUpdateDeadlineConfig> MonthlyUpdateDeadlineConfigs { get; set; }
     public DbSet<WorkReportingCycle> WorkReportingCycles { get; set; }
     public DbSet<WorkReportingCyclePeriod> WorkReportingCyclePeriods { get; set; }
+    public DbSet<WeeklyWorkReportingConfig> WeeklyWorkReportingConfigs { get; set; }
+    public DbSet<WeeklyWorkReportingScopeProject> WeeklyWorkReportingScopeProjects { get; set; }
+    public DbSet<ProjectWeeklyWorkUpdate> ProjectWeeklyWorkUpdates { get; set; }
     public DbSet<ProjectSeniorResponsibleOfficer> ProjectSeniorResponsibleOfficers { get; set; }
     public DbSet<ProjectServiceOwner> ProjectServiceOwners { get; set; }
     public DbSet<ProjectDirectorate> ProjectDirectorates { get; set; }
@@ -3611,6 +3614,43 @@ public partial class CompassDbContext : DbContext
                 .HasForeignKey(p => p.ReportingCycleId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(p => new { p.ReportingCycleId, p.PeriodKey }).IsUnique();
+        });
+
+        modelBuilder.Entity<WeeklyWorkReportingConfig>(e =>
+        {
+            e.HasData(new WeeklyWorkReportingConfig
+            {
+                Id = 1,
+                PeriodStartDayOfWeek = DayOfWeek.Monday,
+                PeriodEndDayOfWeek = DayOfWeek.Friday,
+                DueDayOfWeek = DayOfWeek.Friday,
+                DueWeekOffset = WeeklyWorkReportingDueWeekOffset.SameWeek,
+                FirstReportingPeriodStart = new DateTime(2026, 6, 29, 0, 0, 0, DateTimeKind.Utc),
+                IsActive = true,
+                UpdatedAt = new DateTime(2026, 7, 2, 0, 0, 0, DateTimeKind.Utc)
+            });
+        });
+
+        modelBuilder.Entity<WeeklyWorkReportingScopeProject>(e =>
+        {
+            e.HasIndex(x => x.ProjectId).IsUnique();
+            e.HasOne(x => x.Project)
+                .WithMany()
+                .HasForeignKey(x => x.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProjectWeeklyWorkUpdate>(e =>
+        {
+            e.HasIndex(x => new { x.ProjectId, x.IsoYear, x.IsoWeek }).IsUnique();
+            e.HasOne(x => x.Project)
+                .WithMany(p => p.WeeklyWorkUpdates)
+                .HasForeignKey(x => x.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+            ConfigureRaidNarrativeColumns(e.Property(x => x.Narrative));
+            ConfigureRaidNarrativeColumns(e.Property(x => x.PeopleNarrative));
+            ConfigureRaidNarrativeColumns(e.Property(x => x.DraftRagJustification));
+            ConfigureRaidNarrativeColumns(e.Property(x => x.DraftPathToGreen));
         });
 
         // ----- FIPS CMDB products -----

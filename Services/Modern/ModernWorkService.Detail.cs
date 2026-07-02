@@ -35,6 +35,7 @@ public partial class ModernWorkService
             .Include(x => x.MonthlyUpdates).ThenInclude(mu => mu.CreatedByUser)
             .Include(x => x.MonthlyUpdates).ThenInclude(mu => mu.MonthlyUpdateNarratives)
             .Include(x => x.MonthlyUpdates).ThenInclude(mu => mu.DraftRagStatusLookup)
+            .Include(x => x.WeeklyWorkUpdates).ThenInclude(wu => wu.DraftRagStatusLookup)
             .Include(x => x.Milestones)
             .Include(x => x.Risks).ThenInclude(r => r.OwnerUser)
             .Include(x => x.Risks).ThenInclude(r => r.RiskTier)
@@ -507,12 +508,58 @@ public partial class ModernWorkService
             .ThenByDescending(p => PeriodKeySortDesc(p.PeriodKey))
             .ToList();
 
+        var inWeeklyScope = await _weeklyUpdateService.IsProjectInWeeklyReportingScopeAsync(projectId, cancellationToken);
+        var weeklyReportingPeriods = new List<ReportingCyclePeriod>();
+        var weeklyUpdateSubmittedByNames = new Dictionary<int, string>();
+        if (inWeeklyScope)
+        {
+            var weeklyPeriodInfos = _weeklyUpdateService.EnumerateRecentPeriods(DateTime.UtcNow, 26).ToList();
+            var updatesByWeek = p.WeeklyWorkUpdates.ToLookup(wu => (wu.IsoYear, wu.IsoWeek));
+            foreach (var wp in weeklyPeriodInfos)
+            {
+                var muForPeriod = updatesByWeek[(wp.IsoYear, wp.IsoWeek)].FirstOrDefault();
+                var rollup = _weeklyUpdateService.CalculateUpdateStatus(wp.IsoYear, wp.IsoWeek, muForPeriod?.SubmittedAt);
+                weeklyReportingPeriods.Add(new ReportingCyclePeriod
+                {
+                    PeriodKey = wp.PeriodKey,
+                    PeriodLabel = wp.PeriodLabel,
+                    DueDate = wp.DueDate,
+                    SubmissionOpens = wp.SubmissionOpens,
+                    SubmissionCloses = wp.SubmissionCloses,
+                    UpdateStatus = rollup.ToString(),
+                    WindowAllowsEditing = _weeklyUpdateService.IsWeeklyReportEditingAllowed(wp.IsoYear, wp.IsoWeek)
+                });
+            }
+
+            weeklyReportingPeriods = weeklyReportingPeriods
+                .OrderByDescending(p => p.SubmissionCloses ?? p.DueDate)
+                .ToList();
+
+            var weeklySubmittedUserIds = p.WeeklyWorkUpdates
+                .Where(w => w.SubmittedAt.HasValue && w.CreatedByUserId.HasValue)
+                .Select(w => w.CreatedByUserId!.Value)
+                .Distinct()
+                .ToList();
+            if (weeklySubmittedUserIds.Count > 0)
+            {
+                var weeklyUsers = await _db.Users.AsNoTracking()
+                    .Where(u => weeklySubmittedUserIds.Contains(u.Id))
+                    .Select(u => new { u.Id, u.Name, u.Email })
+                    .ToListAsync(cancellationToken);
+                foreach (var u in weeklyUsers)
+                    weeklyUpdateSubmittedByNames[u.Id] = u.Name ?? u.Email ?? "—";
+            }
+
+            EnrichWeeklyUpdateRagDisplay(work, p, ragLookupById);
+        }
+
         var periodDraft = p.MonthlyUpdates.FirstOrDefault(mu =>
             mu.Year == reportY && mu.Month == reportM && mu.SubmittedAt == null);
 
         var section = (tab ?? "overview").Trim().ToLowerInvariant() switch
         {
             "updates" => "updates",
+            "weeklyupdates" => "weeklyupdates",
             "milestones" => "milestones",
             "risks" => "risks",
             "issues" => "issues",
@@ -619,6 +666,9 @@ public partial class ModernWorkService
         controller.ViewBag.TeamMemberFundingOptions = new List<LookupOption>();
         controller.ViewBag.TeamMemberTypeOptions = new List<LookupOption>();
         controller.ViewBag.ReportingPeriodsList = reportingPeriods;
+        controller.ViewBag.WeeklyReportingPeriodsList = weeklyReportingPeriods;
+        controller.ViewBag.ShowWeeklyReporting = inWeeklyScope;
+        controller.ViewBag.WeeklyUpdateSubmittedByNames = weeklyUpdateSubmittedByNames;
         controller.ViewBag.ReportingPeriodDueByKey = periodDueByKey;
         controller.ViewBag.MonthlyUpdateSubmittedByNames = monthlyUpdateSubmittedByNames;
         controller.ViewBag.RagBgByStatusId = ragBgByStatusId;
@@ -657,6 +707,12 @@ public partial class ModernWorkService
         controller.ViewBag.WorkSideNavMonthlyUpdatesCount =
             (work.Status == "Active" || work.Status == "Paused")
                 ? reportingPeriods.Count(p =>
+                    string.Equals(p.UpdateStatus, nameof(UpdateSubmissionStatus.Due), StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(p.UpdateStatus, nameof(UpdateSubmissionStatus.Late), StringComparison.OrdinalIgnoreCase))
+                : 0;
+        controller.ViewBag.WorkSideNavWeeklyUpdatesCount =
+            inWeeklyScope && (work.Status == "Active" || work.Status == "Paused")
+                ? weeklyReportingPeriods.Count(p =>
                     string.Equals(p.UpdateStatus, nameof(UpdateSubmissionStatus.Due), StringComparison.OrdinalIgnoreCase)
                     || string.Equals(p.UpdateStatus, nameof(UpdateSubmissionStatus.Late), StringComparison.OrdinalIgnoreCase))
                 : 0;

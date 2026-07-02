@@ -63,6 +63,7 @@ public class WorkItem
     public ICollection<WorkItemRagHistory> RagHistory { get; set; } = new List<WorkItemRagHistory>();
     public ICollection<Milestone> Milestones { get; set; } = new List<Milestone>();
     public ICollection<MonthlyUpdate> MonthlyUpdates { get; set; } = new List<MonthlyUpdate>();
+    public ICollection<WeeklyUpdate> WeeklyUpdates { get; set; } = new List<WeeklyUpdate>();
     public ICollection<WorkItemRiskOrIssue> RiskOrIssues { get; set; } = new List<WorkItemRiskOrIssue>();
 
     /// <summary>RAID assumptions scoped to this work item (see project link on assumption records).</summary>
@@ -196,6 +197,30 @@ public class MonthlyUpdate
     public string? Narrative { get; set; }
     public int? RagStatusId { get; set; }
     /// <summary>Resolved display label for submitted returns (includes legacy/history fallbacks).</summary>
+    public string? RagDisplayName { get; set; }
+    public string? RagCssClass { get; set; }
+    public string? RagJustification { get; set; }
+    public string? PathToGreen { get; set; }
+    public string? SubmittedBy { get; set; }
+    public DateTime? SubmittedAt { get; set; }
+    public int? SubmittedByUserId { get; set; }
+    public decimal? PermFte { get; set; }
+    public decimal? MspFte { get; set; }
+    public string? PeopleNarrative { get; set; }
+}
+
+/// <summary>Weekly update block for modern work views (aligned with <see cref="Compass.Models.ProjectWeeklyWorkUpdate"/>).</summary>
+public class WeeklyUpdate
+{
+    public int Id { get; set; }
+    public int WorkItemId { get; set; }
+    public int IsoYear { get; set; }
+    public int IsoWeek { get; set; }
+    public DateTime WeekStartDate { get; set; }
+    public DateTime WeekEndDate { get; set; }
+    public string PeriodLabel { get; set; } = string.Empty;
+    public string? Narrative { get; set; }
+    public int? RagStatusId { get; set; }
     public string? RagDisplayName { get; set; }
     public string? RagCssClass { get; set; }
     public string? RagJustification { get; set; }

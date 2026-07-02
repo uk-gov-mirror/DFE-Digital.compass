@@ -30,6 +30,16 @@
         Description = "Submission progress over the reporting window, with directorate and business area league tables."
       })
       @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingDashboardCard.cshtml", new ReportingDashboardCardViewModel {
+        Title = "Weekly report",
+        Href = Url.Action("WeeklyUpdate", "ModernReporting") ?? "#",
+        Description = "Portfolio RAG, priorities, milestones, and business area roll-up for a weekly reporting period."
+      })
+      @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingDashboardCard.cshtml", new ReportingDashboardCardViewModel {
+        Title = "Weekly submission progress",
+        Href = Url.Action("WeeklySubmissionProgress", "ModernReporting") ?? "#",
+        Description = "Weekly return submission progress over the reporting window, with directorate and business area league tables."
+      })
+      @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingDashboardCard.cshtml", new ReportingDashboardCardViewModel {
         Title = "Priorities report",
         Href = Url.Action("Priorities", "ModernReporting") ?? "#",
         Description = "Monthly metrics by mission pillar, priority outcome, or delivery priority — with drill-down into work items."

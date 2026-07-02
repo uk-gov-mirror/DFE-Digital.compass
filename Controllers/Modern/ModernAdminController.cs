@@ -27,6 +27,7 @@ public partial class ModernAdminController : Controller
     private readonly IApiTokenService _apiTokenService;
     private readonly IFipsBusinessAreaLookupSyncService _fipsBusinessAreaLookupSync;
     private readonly IGlobalFeatureToggleService _globalFeatureToggle;
+    private readonly IWeeklyUpdateService _weeklyUpdateService;
 
     private static readonly HashSet<string> AdminHubValidPanels = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -59,7 +60,8 @@ public partial class ModernAdminController : Controller
         IProductsApiService productsApi,
         IApiTokenService apiTokenService,
         IFipsBusinessAreaLookupSyncService fipsBusinessAreaLookupSync,
-        IGlobalFeatureToggleService globalFeatureToggle)
+        IGlobalFeatureToggleService globalFeatureToggle,
+        IWeeklyUpdateService weeklyUpdateService)
     {
         _context = context;
         _demandScoringFramework = demandScoringFramework;
@@ -67,6 +69,7 @@ public partial class ModernAdminController : Controller
         _apiTokenService = apiTokenService;
         _fipsBusinessAreaLookupSync = fipsBusinessAreaLookupSync;
         _globalFeatureToggle = globalFeatureToggle;
+        _weeklyUpdateService = weeklyUpdateService;
     }
 
     private void SetAdminChrome(string subNavItem)
@@ -1487,6 +1490,58 @@ public partial class ModernAdminController : Controller
 
         var vm = new WorkReportingViewModel { ReportingPeriods = rows };
 
+        var weeklyConfig = await _weeklyUpdateService.GetOrCreateConfigAsync();
+        vm.WeeklyConfig = new WeeklyWorkReportingConfigFormViewModel
+        {
+            PeriodStartDayOfWeek = weeklyConfig.PeriodStartDayOfWeek,
+            PeriodEndDayOfWeek = weeklyConfig.PeriodEndDayOfWeek,
+            DueDayOfWeek = weeklyConfig.DueDayOfWeek,
+            DueWeekOffset = weeklyConfig.DueWeekOffset,
+            FirstReportingPeriodStart = weeklyConfig.FirstReportingPeriodStart,
+            IsActive = weeklyConfig.IsActive
+        };
+
+        var scopeRows = await _context.WeeklyWorkReportingScopeProjects.AsNoTracking()
+            .Include(x => x.Project).ThenInclude(p => p.BusinessAreaLookup)
+            .Include(x => x.Project).ThenInclude(p => p.PrimaryOrganizationalGroup)
+            .OrderBy(x => x.Project.Title)
+            .ToListAsync();
+        vm.WeeklyScopeProjects = scopeRows.Select(x => new WeeklyWorkReportingScopeRow
+        {
+            ScopeId = x.Id,
+            ProjectId = x.ProjectId,
+            Title = x.Project.Title ?? "",
+            Status = x.Project.Status ?? "",
+            BusinessArea = Services.Modern.ModernWorkService.ResolveProjectBusinessAreaDisplayName(x.Project)
+        }).ToList();
+
+        var scopedIds = scopeRows.Select(x => x.ProjectId).ToHashSet();
+        var candidateBase = _context.Projects.AsNoTracking()
+            .Where(p => !p.IsDeleted && (p.Status == "Active" || p.Status == "Paused") && !scopedIds.Contains(p.Id));
+
+        var scopeSearch = (Request.Query["scopeSearch"].ToString() ?? "").Trim();
+        if (!string.IsNullOrWhiteSpace(scopeSearch))
+        {
+            candidateBase = candidateBase.Where(p =>
+                p.Title.Contains(scopeSearch) ||
+                (p.Aim != null && p.Aim.Contains(scopeSearch)));
+        }
+
+        var candidateProjects = await candidateBase
+            .Include(p => p.BusinessAreaLookup)
+            .Include(p => p.PrimaryOrganizationalGroup)
+            .OrderBy(p => p.Title)
+            .Take(50)
+            .ToListAsync();
+
+        vm.WeeklyScopeCandidates = candidateProjects.Select(p => new WeeklyWorkReportingScopeCandidateRow
+        {
+            ProjectId = p.Id,
+            Title = p.Title ?? "",
+            Status = p.Status ?? "",
+            BusinessArea = Services.Modern.ModernWorkService.ResolveProjectBusinessAreaDisplayName(p)
+        }).ToList();
+
         if (TempData["AdminMessage"] is string amsg)
             ViewBag.AdminMessage = amsg;
         else if (TempData["Message"] is string msg)
@@ -1677,6 +1732,125 @@ public partial class ModernAdminController : Controller
         await _context.SaveChangesAsync();
 
         TempData["AdminMessage"] = $"Monthly reporting period \"{periodLabel}\" updated.";
+        return RedirectToAction(nameof(WorkReporting));
+    }
+
+    [HttpPost("work-reporting/weekly-config")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> WorkReportingWeeklyConfigSave(
+        int periodStartDayOfWeek,
+        int periodEndDayOfWeek,
+        int dueDayOfWeek,
+        WeeklyWorkReportingDueWeekOffset dueWeekOffset,
+        int? firstReportingPeriodStartDay,
+        int? firstReportingPeriodStartMonth,
+        int? firstReportingPeriodStartYear,
+        bool isActive)
+    {
+        if (!Enum.IsDefined(typeof(DayOfWeek), periodStartDayOfWeek) ||
+            !Enum.IsDefined(typeof(DayOfWeek), periodEndDayOfWeek) ||
+            !Enum.IsDefined(typeof(DayOfWeek), dueDayOfWeek))
+        {
+            TempData["AdminError"] = "Select valid days of the week for the reporting period and due date.";
+            return RedirectToAction(nameof(WorkReporting));
+        }
+
+        if (!TryParseUtcDateParts(
+                firstReportingPeriodStartDay,
+                firstReportingPeriodStartMonth,
+                firstReportingPeriodStartYear,
+                out var firstReportingPeriodStart))
+        {
+            TempData["AdminError"] = "Enter a complete valid date for the first reporting period start (day, month and year).";
+            return RedirectToAction(nameof(WorkReporting));
+        }
+
+        firstReportingPeriodStart = NormalizeUtcDate(firstReportingPeriodStart);
+
+        var start = (DayOfWeek)periodStartDayOfWeek;
+        var end = (DayOfWeek)periodEndDayOfWeek;
+        if ((int)end < (int)start)
+        {
+            TempData["AdminError"] = "Period end day must be on or after period start day within the working week.";
+            return RedirectToAction(nameof(WorkReporting));
+        }
+
+        if (firstReportingPeriodStart.DayOfWeek != start)
+        {
+            TempData["AdminError"] = $"First reporting period start must fall on a {start} (the same day as period starts).";
+            return RedirectToAction(nameof(WorkReporting));
+        }
+
+        var config = await _weeklyUpdateService.GetOrCreateConfigAsync();
+        config.PeriodStartDayOfWeek = start;
+        config.PeriodEndDayOfWeek = end;
+        config.DueDayOfWeek = (DayOfWeek)dueDayOfWeek;
+        config.DueWeekOffset = dueWeekOffset;
+        config.FirstReportingPeriodStart = firstReportingPeriodStart;
+        config.IsActive = isActive;
+        config.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        TempData["AdminMessage"] = "Weekly reporting settings saved.";
+        return RedirectToAction(nameof(WorkReporting));
+    }
+
+    [HttpPost("work-reporting/weekly-scope/add")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> WorkReportingWeeklyScopeAdd(int projectId)
+    {
+        var project = await _context.Projects.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == projectId && !p.IsDeleted);
+        if (project == null)
+        {
+            TempData["AdminError"] = "Work item not found.";
+            return RedirectToAction(nameof(WorkReporting));
+        }
+
+        if (project.Status is not ("Active" or "Paused"))
+        {
+            TempData["AdminError"] = "Only Active or Paused work items can be added to weekly reporting scope.";
+            return RedirectToAction(nameof(WorkReporting));
+        }
+
+        var exists = await _context.WeeklyWorkReportingScopeProjects
+            .AnyAsync(x => x.ProjectId == projectId);
+        if (exists)
+        {
+            TempData["AdminMessage"] = "That work item is already in weekly reporting scope.";
+            return RedirectToAction(nameof(WorkReporting));
+        }
+
+        _context.WeeklyWorkReportingScopeProjects.Add(new WeeklyWorkReportingScopeProject
+        {
+            ProjectId = projectId,
+            AddedAt = DateTime.UtcNow,
+            AddedByEmail = User.Identity?.Name
+        });
+        await _context.SaveChangesAsync();
+
+        TempData["AdminMessage"] = $"Added \"{project.Title}\" to weekly reporting scope.";
+        return RedirectToAction(nameof(WorkReporting));
+    }
+
+    [HttpPost("work-reporting/weekly-scope/{scopeId:int}/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> WorkReportingWeeklyScopeRemove(int scopeId)
+    {
+        var row = await _context.WeeklyWorkReportingScopeProjects
+            .Include(x => x.Project)
+            .FirstOrDefaultAsync(x => x.Id == scopeId);
+        if (row == null)
+        {
+            TempData["AdminError"] = "Scope entry not found.";
+            return RedirectToAction(nameof(WorkReporting));
+        }
+
+        var title = row.Project?.Title ?? "Work item";
+        _context.WeeklyWorkReportingScopeProjects.Remove(row);
+        await _context.SaveChangesAsync();
+
+        TempData["AdminMessage"] = $"Removed \"{title}\" from weekly reporting scope.";
         return RedirectToAction(nameof(WorkReporting));
     }
 

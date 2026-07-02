@@ -1,0 +1,78 @@
+@model Compass.ViewModels.Modern.WeeklyReportPeriodToolbarViewModel
+@{
+  var t = Model ?? new Compass.ViewModels.Modern.WeeklyReportPeriodToolbarViewModel();
+}
+
+<div class="mr-toolbar mr-toolbar--compact govuk-!-margin-bottom-3">
+  <div class="mr-toolbar__row">
+    <div class="mr-toolbar__nav mr-toolbar__nav--compact">
+      @if (t.HasPreviousWeekNav && t.PreviousNavIsoYear.HasValue && t.PreviousNavIsoWeek.HasValue)
+      {
+        <a class="govuk-link mr-toolbar__nav-link govuk-link--no-visited-state" href="@t.PreviousNavUrl">← W@t.PreviousNavIsoWeek.Value.ToString("D2")</a>
+      }
+      <span class="mr-toolbar__period">
+        @t.PeriodLabel
+        @if (!string.IsNullOrWhiteSpace(t.PeriodMeta))
+        {
+          <span class="dfe-c-text-muted">@t.PeriodMeta</span>
+        }
+      </span>
+      @if (t.HasNextWeekNav && t.NextNavIsoYear.HasValue && t.NextNavIsoWeek.HasValue)
+      {
+        <a class="govuk-link mr-toolbar__nav-link govuk-link--no-visited-state" href="@t.NextNavUrl">W@t.NextNavIsoWeek.Value.ToString("D2") →</a>
+      }
+    </div>
+    <form method="get" action="@t.FormAction" class="mr-toolbar__filters mr-toolbar__filters--compact" data-page-loading id="@(t.IdPrefix)-filters-form">
+      <input type="hidden" name="isoYear" id="@(t.IdPrefix)-iso-year" value="@t.IsoYear" />
+      <input type="hidden" name="isoWeek" id="@(t.IdPrefix)-iso-week" value="@t.IsoWeek" />
+      <select class="govuk-select mr-toolbar__filter--period" id="@t.FilterPeriodId" aria-label="Reporting week">
+        @foreach (var period in t.RecentPeriods)
+        {
+          var selected = t.IsoYear == period.IsoYear && t.IsoWeek == period.IsoWeek;
+          if (selected)
+          {
+            <option value="@period.PeriodKey" selected>@period.PeriodLabel</option>
+          }
+          else
+          {
+            <option value="@period.PeriodKey">@period.PeriodLabel</option>
+          }
+        }
+      </select>
+      <select name="businessAreaId" class="govuk-select mr-toolbar__filter--business-area" id="@t.FilterBusinessAreaIdElement" aria-label="Business area">
+        <option value="">All areas</option>
+        @foreach (var ba in t.BusinessAreas)
+        {
+          if (t.FilterBusinessAreaId == ba.Id) { <option value="@ba.Id" selected>@ba.Name</option> }
+          else { <option value="@ba.Id">@ba.Name</option> }
+        }
+      </select>
+      <select name="directorateId" class="govuk-select mr-toolbar__filter--directorate" id="@t.FilterDirectorateIdElement" aria-label="Directorate">
+        <option value="">All directorates</option>
+        @foreach (var d in t.Directorates)
+        {
+          if (t.FilterDirectorateId == d.Id) { <option value="@d.Id" selected>@d.Name</option> }
+          else { <option value="@d.Id">@d.Name</option> }
+        }
+      </select>
+      <button type="submit" class="govuk-button mr-toolbar__filter--apply govuk-!-margin-bottom-0" id="@t.FilterApplyId">Apply</button>
+    </form>
+  </div>
+</div>
+
+<script nonce="@Context.Items["Nonce"]">
+  (function () {
+    var periodSelect = document.getElementById('@t.FilterPeriodId');
+    var yearInput = document.getElementById('@(t.IdPrefix)-iso-year');
+    var weekInput = document.getElementById('@(t.IdPrefix)-iso-week');
+    if (!periodSelect || !yearInput || !weekInput) return;
+
+    periodSelect.addEventListener('change', function () {
+      var key = periodSelect.value || '';
+      var match = key.match(/^(\d{4})-W(\d{2})$/);
+      if (!match) return;
+      yearInput.value = match[1];
+      weekInput.value = String(parseInt(match[2], 10));
+    });
+  })();
+</script>

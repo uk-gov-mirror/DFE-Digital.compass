@@ -114,7 +114,9 @@ public class ModernDashboardController : Controller
                 currentUser, userEmail);
 
             var preference = await _dashboardBuilder.GetOrCreateDashboardPreferenceAsync(effectiveUser);
-            var viewModel = await _dashboardBuilder.BuildDashboardViewModelAsync(effectiveUser, effectiveUserEmail, preference, Url, HttpContext);
+            var showRaidIssues = ViewBag.ShowRaidNavigation as bool? == true;
+            var viewModel = await _dashboardBuilder.BuildDashboardViewModelAsync(
+                effectiveUser, effectiveUserEmail, preference, Url, HttpContext, showRaidIssues);
 
             var fipsRegisterEnabled =
                 await _globalFeatureToggle.IsFeatureEnabledForPrincipalAsync(FeatureCodes.Fips, User);

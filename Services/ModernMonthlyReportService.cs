@@ -11,19 +11,22 @@ using Microsoft.EntityFrameworkCore;
 namespace Compass.Services;
 
 /// <summary>Builds data for the modern monthly reporting dashboard (aligned with Central Ops Monthly Summary V2 logic).</summary>
-public class ModernMonthlyReportService
+public partial class ModernMonthlyReportService
 {
     private readonly CompassDbContext _db;
     private readonly IMonthlyUpdateService _monthlyUpdateService;
+    private readonly IWeeklyUpdateService _weeklyUpdateService;
     private readonly IAissSummaryService _aissSummary;
 
     public ModernMonthlyReportService(
         CompassDbContext db,
         IMonthlyUpdateService monthlyUpdateService,
+        IWeeklyUpdateService weeklyUpdateService,
         IAissSummaryService aissSummary)
     {
         _db = db;
         _monthlyUpdateService = monthlyUpdateService;
+        _weeklyUpdateService = weeklyUpdateService;
         _aissSummary = aissSummary;
     }
 

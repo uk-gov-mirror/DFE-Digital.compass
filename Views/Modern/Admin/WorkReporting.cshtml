@@ -1,5 +1,6 @@
 @model Compass.ViewModels.Modern.WorkReportingViewModel
 @using Compass.ViewModels.Modern
+@using Compass.Models
 @using Microsoft.AspNetCore.Html
 @{
     ViewData["Title"] = "Work reporting";
@@ -97,4 +98,170 @@
       </tbody>
     </table>
   </div>
+
+  <hr class="govuk-section-break govuk-section-break--visible govuk-section-break--l govuk-!-margin-top-6 govuk-!-margin-bottom-6" />
+
+  <div class="dfe-c-mb-2">
+    <h2 class="govuk-heading-m" style="margin:0;">Weekly reporting</h2>
+    <p class="govuk-body govuk-hint govuk-!-margin-bottom-0 govuk-!-margin-top-1">Configure working-week periods (typically Monday to Friday) and which work items must submit weekly returns. Due date can fall in the same week or the week after the reporting period.</p>
+  </div>
+
+  <form method="post" action="@Url.Action("WorkReportingWeeklyConfigSave", "ModernAdmin")" class="govuk-!-margin-bottom-6">
+    @Html.AntiForgeryToken()
+    <div class="govuk-form-group">
+      <fieldset class="govuk-fieldset">
+        <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Reporting period (days of week)</legend>
+        <div class="govuk-grid-row">
+          <div class="govuk-grid-column-one-half">
+            <label class="govuk-label" for="periodStartDayOfWeek">Period starts</label>
+            <select class="govuk-select" id="periodStartDayOfWeek" name="periodStartDayOfWeek">
+              @foreach (DayOfWeek day in Enum.GetValues(typeof(DayOfWeek)))
+              {
+                if (day is DayOfWeek.Saturday or DayOfWeek.Sunday) { continue; }
+                <option value="@((int)day)" selected="@(Model.WeeklyConfig.PeriodStartDayOfWeek == day)">@day</option>
+              }
+            </select>
+          </div>
+          <div class="govuk-grid-column-one-half">
+            <label class="govuk-label" for="periodEndDayOfWeek">Period ends</label>
+            <select class="govuk-select" id="periodEndDayOfWeek" name="periodEndDayOfWeek">
+              @foreach (DayOfWeek day in Enum.GetValues(typeof(DayOfWeek)))
+              {
+                if (day is DayOfWeek.Saturday or DayOfWeek.Sunday) { continue; }
+                <option value="@((int)day)" selected="@(Model.WeeklyConfig.PeriodEndDayOfWeek == day)">@day</option>
+              }
+            </select>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+    <div class="govuk-form-group">
+      @await Html.PartialAsync("~/Views/Modern/Raid/_RaidGovUkDateInput.cshtml", new RaidGovUkDateFieldVm {
+        NamePrefix = "FirstReportingPeriodStart",
+        Legend = "First reporting period starts",
+        Hint = "The first week teams can submit for (must match the period start day above). Weeks before this date are excluded.",
+        Day = Model.WeeklyConfig.FirstReportingPeriodStart?.Day,
+        Month = Model.WeeklyConfig.FirstReportingPeriodStart?.Month,
+        Year = Model.WeeklyConfig.FirstReportingPeriodStart?.Year
+      })
+    </div>
+    <div class="govuk-form-group">
+      <fieldset class="govuk-fieldset">
+        <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Submission due</legend>
+        <div class="govuk-grid-row">
+          <div class="govuk-grid-column-one-half">
+            <label class="govuk-label" for="dueDayOfWeek">Due on</label>
+            <select class="govuk-select" id="dueDayOfWeek" name="dueDayOfWeek">
+              @foreach (DayOfWeek day in Enum.GetValues(typeof(DayOfWeek)))
+              {
+                if (day is DayOfWeek.Saturday or DayOfWeek.Sunday) { continue; }
+                <option value="@((int)day)" selected="@(Model.WeeklyConfig.DueDayOfWeek == day)">@day</option>
+              }
+            </select>
+          </div>
+          <div class="govuk-grid-column-one-half">
+            <label class="govuk-label" for="dueWeekOffset">Due in</label>
+            <select class="govuk-select" id="dueWeekOffset" name="dueWeekOffset">
+              <option value="@((int)WeeklyWorkReportingDueWeekOffset.SameWeek)" selected="@(Model.WeeklyConfig.DueWeekOffset == WeeklyWorkReportingDueWeekOffset.SameWeek)">Same week as reporting period</option>
+              <option value="@((int)WeeklyWorkReportingDueWeekOffset.WeekAfter)" selected="@(Model.WeeklyConfig.DueWeekOffset == WeeklyWorkReportingDueWeekOffset.WeekAfter)">Week after reporting period</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+    <div class="govuk-form-group">
+      <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+        <div class="govuk-checkboxes__item">
+          <input class="govuk-checkboxes__input" id="weeklyIsActive" name="isActive" type="checkbox" value="true" @(Model.WeeklyConfig.IsActive ? "checked" : null) />
+          <label class="govuk-label govuk-checkboxes__label" for="weeklyIsActive">Weekly reporting active</label>
+        </div>
+      </div>
+    </div>
+    <button type="submit" class="govuk-button" data-module="govuk-button">Save weekly settings</button>
+  </form>
+
+  <h3 class="govuk-heading-s">Work items in weekly reporting scope</h3>
+  <p class="govuk-hint">Only work items in this list see the Weekly updates section on their detail page.</p>
+
+  @if (Model.WeeklyScopeProjects.Count > 0)
+  {
+    <div class="dfe-f-table-wrapper govuk-!-margin-bottom-4" data-module="dfe-f-table">
+      <table class="govuk-table govuk-table--small dfe-f-table--condensed">
+        <thead class="govuk-table__head">
+          <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Work item</th>
+            <th scope="col" class="govuk-table__header">Status</th>
+            <th scope="col" class="govuk-table__header">Business area</th>
+            <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+          @foreach (var row in Model.WeeklyScopeProjects)
+          {
+            <tr class="govuk-table__row">
+              <td class="govuk-table__cell"><a class="govuk-link govuk-link--no-visited-state" href="@Url.Action("Detail", "ModernWork", new { id = row.ProjectId })">@row.Title</a></td>
+              <td class="govuk-table__cell">@row.Status</td>
+              <td class="govuk-table__cell">@row.BusinessArea</td>
+              <td class="govuk-table__cell">
+                <form method="post" action="@Url.Action("WorkReportingWeeklyScopeRemove", "ModernAdmin", new { scopeId = row.ScopeId })" style="display:inline;">
+                  @Html.AntiForgeryToken()
+                  <button type="submit" class="govuk-link govuk-link--no-visited-state" style="border:none;background:none;padding:0;cursor:pointer;">Remove</button>
+                </form>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+  else
+  {
+    <p class="govuk-body govuk-hint">No work items in scope yet.</p>
+  }
+
+  <h3 class="govuk-heading-s govuk-!-margin-top-4">Add work item to scope</h3>
+  <form method="get" action="@Url.Action("WorkReporting", "ModernAdmin")" class="filter-toolbar govuk-!-margin-bottom-2">
+    <div class="filter-toolbar__search-wrap">
+      <label class="govuk-label govuk-visually-hidden" for="scopeSearch">Search work items</label>
+      <input class="govuk-input filter-search" id="scopeSearch" name="scopeSearch" type="search" value="@Context.Request.Query["scopeSearch"]" placeholder="Search by title" />
+    </div>
+    <button type="submit" class="govuk-button govuk-!-margin-bottom-0">Search</button>
+  </form>
+
+  @if (Model.WeeklyScopeCandidates.Count > 0)
+  {
+    <div class="dfe-f-table-wrapper" data-module="dfe-f-table">
+      <table class="govuk-table govuk-table--small dfe-f-table--condensed">
+        <thead class="govuk-table__head">
+          <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Work item</th>
+            <th scope="col" class="govuk-table__header">Status</th>
+            <th scope="col" class="govuk-table__header">Business area</th>
+            <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+          @foreach (var row in Model.WeeklyScopeCandidates)
+          {
+            <tr class="govuk-table__row">
+              <td class="govuk-table__cell">@row.Title</td>
+              <td class="govuk-table__cell">@row.Status</td>
+              <td class="govuk-table__cell">@row.BusinessArea</td>
+              <td class="govuk-table__cell">
+                <form method="post" action="@Url.Action("WorkReportingWeeklyScopeAdd", "ModernAdmin")" style="display:inline;">
+                  @Html.AntiForgeryToken()
+                  <input type="hidden" name="projectId" value="@row.ProjectId" />
+                  <button type="submit" class="govuk-link govuk-link--no-visited-state" style="border:none;background:none;padding:0;cursor:pointer;">Add</button>
+                </form>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+  else
+  {
+    <p class="govuk-body govuk-hint">No matching Active or Paused work items to add.</p>
+  }
 </div>
