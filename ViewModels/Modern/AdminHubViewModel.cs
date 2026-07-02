@@ -1,3 +1,4 @@
+using Compass.Models;
 using Compass.Services;
 
 namespace Compass.ViewModels.Modern;
@@ -229,6 +230,37 @@ public class WorkReportingViewModel
 {
     /// <summary>Explicit monthly reporting periods (commission-style dates).</summary>
     public List<WorkReportingPeriodRow> ReportingPeriods { get; set; } = new();
+
+    public WeeklyWorkReportingConfigFormViewModel WeeklyConfig { get; set; } = new();
+    public List<WeeklyWorkReportingScopeRow> WeeklyScopeProjects { get; set; } = new();
+    public List<WeeklyWorkReportingScopeCandidateRow> WeeklyScopeCandidates { get; set; } = new();
+}
+
+public class WeeklyWorkReportingConfigFormViewModel
+{
+    public DayOfWeek PeriodStartDayOfWeek { get; set; } = DayOfWeek.Monday;
+    public DayOfWeek PeriodEndDayOfWeek { get; set; } = DayOfWeek.Friday;
+    public DayOfWeek DueDayOfWeek { get; set; } = DayOfWeek.Friday;
+    public WeeklyWorkReportingDueWeekOffset DueWeekOffset { get; set; } = WeeklyWorkReportingDueWeekOffset.SameWeek;
+    public DateTime? FirstReportingPeriodStart { get; set; } = new(2026, 6, 29, 0, 0, 0, DateTimeKind.Utc);
+    public bool IsActive { get; set; } = true;
+}
+
+public class WeeklyWorkReportingScopeRow
+{
+    public int ScopeId { get; set; }
+    public int ProjectId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string BusinessArea { get; set; } = "—";
+}
+
+public class WeeklyWorkReportingScopeCandidateRow
+{
+    public int ProjectId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string BusinessArea { get; set; } = "—";
 }
 
 /// <summary>Admin list row for <see cref="Models.WorkReportingCyclePeriod"/>.</summary>

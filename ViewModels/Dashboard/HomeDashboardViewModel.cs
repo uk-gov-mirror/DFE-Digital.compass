@@ -54,6 +54,7 @@ public class HomeDashboardViewModel
     /// <summary>Active or paused work items still due or late for the applicable monthly period.</summary>
     public int MonthlyReportingRemainingCount { get; set; }
     public IReadOnlyCollection<(ProductDto Product, Commission Commission, CommissionSubmissionStatus Status, DateTime DueDate)> ProductsNeedingCommissionReporting { get; set; } = Array.Empty<(ProductDto, Commission, CommissionSubmissionStatus, DateTime)>();
+    public YourTasksViewModel YourTasks { get; set; } = new();
     public IReadOnlyCollection<Project> OversightProjects { get; set; } = Array.Empty<Project>();
     public IReadOnlyCollection<UserBusinessAreaRoleAssignment> LeadershipAssignments { get; set; } = Array.Empty<UserBusinessAreaRoleAssignment>();
     public IReadOnlyCollection<string> LeadershipBusinessAreas { get; set; } = Array.Empty<string>();

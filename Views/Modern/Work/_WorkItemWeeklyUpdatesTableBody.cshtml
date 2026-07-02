@@ -1,0 +1,121 @@
+@model Compass.Models.Modern.Work.WorkItem
+@using Compass.Models.Modern.Work
+@{
+  var periods = ViewBag.WeeklyTablePeriods as IEnumerable<ReportingCyclePeriod> ?? Enumerable.Empty<ReportingCyclePeriod>();
+  var weeklyUpdatesList = Model.WeeklyUpdates?.OrderByDescending(w => w.WeekStartDate).ToList() ?? new List<WeeklyUpdate>();
+  var weeklyUpdateSubmittedByNames = ViewBag.WeeklyUpdateSubmittedByNames as Dictionary<int, string> ?? new Dictionary<int, string>();
+  var ragStatusesDict = ViewBag.RagStatusesDict as Dictionary<int, string> ?? new Dictionary<int, string>();
+  var fallbackRagByUpdateId = ViewBag.FallbackRagByUpdateId as Dictionary<int, int> ?? new Dictionary<int, int>();
+
+  string WeeklyUpdateRagLabel(WeeklyUpdate? update, int? ragId)
+  {
+    if (update != null && !string.IsNullOrWhiteSpace(update.RagDisplayName))
+      return update.RagDisplayName!;
+    if (ragId is > 0 && ragStatusesDict.TryGetValue(ragId.Value, out var label))
+      return label;
+    return "—";
+  }
+}
+
+<div class="overflow-x-auto">
+  <div class="dfe-f-table-wrapper" data-module="dfe-f-table">
+    <div class="govuk-visually-hidden" aria-live="polite" data-dfe-table-sort-live></div>
+    <table class="govuk-table govuk-table--small-text-until-tablet dfe-f-table--condensed" style="table-layout:auto;">
+      <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+          <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Period</button></th>
+          <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Due</button></th>
+          <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Status</button></th>
+          <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">RAG rating</button></th>
+          <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Submitted date</button></th>
+          <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Submitted by</button></th>
+        </tr>
+      </thead>
+      <tbody class="govuk-table__body">
+        @foreach (var period in periods)
+        {
+          var parts = period.PeriodKey.Split('-');
+          var periodYear = parts.Length >= 1 && int.TryParse(parts[0], out var y) ? y : 0;
+          var periodWeek = parts.Length >= 2 && parts[1].StartsWith("W", StringComparison.OrdinalIgnoreCase) && int.TryParse(parts[1][1..], out var w) ? w : 0;
+          if (periodYear <= 0 || periodWeek <= 0) { continue; }
+
+          var submittedUpdate = weeklyUpdatesList.FirstOrDefault(u => u.IsoYear == periodYear && u.IsoWeek == periodWeek);
+          var isDraft = submittedUpdate != null && !submittedUpdate.SubmittedAt.HasValue;
+          var isSubmitted = submittedUpdate != null && submittedUpdate.SubmittedAt.HasValue;
+          var isUpcoming = submittedUpdate == null;
+          var canSubmit = isUpcoming && period.WindowAllowsEditing
+              && !string.Equals(period.UpdateStatus, "Upcoming", StringComparison.OrdinalIgnoreCase);
+          var canContinueDraft = isDraft && period.WindowAllowsEditing;
+          var isLate = string.Equals(period.UpdateStatus, "Late", StringComparison.OrdinalIgnoreCase);
+          var effectiveRagId = submittedUpdate != null
+              ? (submittedUpdate.RagStatusId ?? (fallbackRagByUpdateId.TryGetValue(submittedUpdate.Id, out var fid) ? fid : (int?)null))
+              : null;
+          var uRagName = WeeklyUpdateRagLabel(submittedUpdate, effectiveRagId);
+          var submittedByDisplay = submittedUpdate != null && submittedUpdate.SubmittedByUserId.HasValue && weeklyUpdateSubmittedByNames.TryGetValue(submittedUpdate.SubmittedByUserId.Value, out var sb)
+              ? sb
+              : (submittedUpdate?.SubmittedBy ?? "—");
+
+          <tr class="govuk-table__row" style="cursor:default;">
+            <td class="govuk-table__cell">
+              @if (isSubmitted)
+              {
+                <a href="@Url.Action("ViewWeeklyUpdate", "ModernWork", new { id = Model.Id, updateId = submittedUpdate!.Id })" class="govuk-link govuk-link--no-visited-state govuk-!-font-weight-bold">@period.PeriodLabel</a>
+              }
+              else if (canContinueDraft)
+              {
+                <a href="@Url.Action("WeeklyReport", "ModernWork", new { id = Model.Id, year = periodYear, week = periodWeek })" class="govuk-link govuk-link--no-visited-state govuk-!-font-weight-bold">@period.PeriodLabel</a>
+              }
+              else if (canSubmit)
+              {
+                <a href="@Url.Action("AddWeeklyUpdate", "ModernWork", new { id = Model.Id, periodKey = period.PeriodKey })" class="govuk-link govuk-link--no-visited-state govuk-!-font-weight-bold">@period.PeriodLabel</a>
+              }
+              else
+              {
+                @period.PeriodLabel
+              }
+            </td>
+            <td class="govuk-table__cell">@(period.SubmissionCloses?.ToString("d MMM yyyy") ?? period.DueDate.ToString("d MMM yyyy"))</td>
+            <td class="govuk-table__cell">
+              @if (isSubmitted)
+              {
+                <span class="dfe-f-badge dfe-f-badge--small dfe-f-badge--green">Submitted</span>
+              }
+              else if (isDraft && canContinueDraft)
+              {
+                <span class="dfe-f-badge dfe-f-badge--small dfe-f-badge--blue">Continue return</span>
+              }
+              else if (isDraft && !canContinueDraft)
+              {
+                <span class="govuk-hint govuk-!-margin-bottom-0">Outside submission window</span>
+              }
+              else if (canSubmit)
+              {
+                <span class="dfe-f-badge dfe-f-badge--small dfe-f-badge--red">@(isLate ? "Late" : "Not submitted")</span>
+              }
+              else if (isLate)
+              {
+                <span class="dfe-f-badge dfe-f-badge--small dfe-f-badge--red">Late</span>
+              }
+              else
+              {
+                <span class="dfe-f-badge dfe-f-badge--small dfe-f-badge--grey">@period.UpdateStatus</span>
+              }
+            </td>
+            <td class="govuk-table__cell">
+              @if (isSubmitted || (isDraft && !string.IsNullOrWhiteSpace(uRagName) && uRagName != "—"))
+              {
+                <span class="@WorkBadgeCss.RagCompactBadgeClass(uRagName == "—" ? null : uRagName)">@(uRagName == "—" ? "—" : uRagName.ToUpperInvariant())</span>
+              }
+              else
+              {
+                <text>—</text>
+              }
+            </td>
+            <td class="govuk-table__cell">@(submittedUpdate?.SubmittedAt?.ToString("d MMM yyyy") ?? "—")</td>
+            <td class="govuk-table__cell">@submittedByDisplay</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
