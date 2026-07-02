@@ -513,6 +513,7 @@ public class ProductReportingController : Controller
         var now = DateTime.UtcNow;
         var isOpen = now >= selectedCommission.OpenDate && now <= selectedCommission.DueDate.AddDays(1);
         var isPastDue = now > selectedCommission.DueDate;
+        var eligibilityCache = await _eligibilityService.LoadEligibilityCacheAsync();
 
         // Fetch user's products - from service_owner, product_manager, delivery_manager, and reporting_user
         var productsByServiceOwner = await _productsApiService.GetProductsByServiceOwnerAsync(userEmail);
@@ -573,6 +574,12 @@ public class ProductReportingController : Controller
         var userProductStatuses = new List<CommissionSubmissionStatusViewModel>();
         foreach (var product in userProducts)
         {
+            if (!CommissionReportingProductScope.ProductMatchesCommissionInScopeRules(selectedCommission, product))
+                continue;
+
+            if (_eligibilityService.IsProductExcludedForCommission(product, selectedCommission, eligibilityCache))
+                continue;
+
             var submission = allSubmissions.GetValueOrDefault(product.DocumentId ?? "");
             var vm = new CommissionSubmissionStatusViewModel
             {
@@ -632,6 +639,12 @@ public class ProductReportingController : Controller
             
             foreach (var product in activeProducts)
             {
+                if (!CommissionReportingProductScope.ProductMatchesCommissionInScopeRules(selectedCommission, product))
+                    continue;
+
+                if (_eligibilityService.IsProductExcludedForCommission(product, selectedCommission, eligibilityCache))
+                    continue;
+
                 var submission = allSubmissions.GetValueOrDefault(product.DocumentId ?? "");
                 var vm = new CommissionSubmissionStatusViewModel
                 {
@@ -895,6 +908,13 @@ public class ProductReportingController : Controller
         if (!CommissionReportingProductScope.ProductMatchesCommissionInScopeRules(commission, product))
         {
             TempData["ErrorMessage"] = "This product is not in scope for this commission.";
+            return RedirectToAction("Commission", new { commissionId });
+        }
+
+        var eligibilityCache = await _eligibilityService.LoadEligibilityCacheAsync();
+        if (_eligibilityService.IsProductExcludedForCommission(product, commission, eligibilityCache))
+        {
+            TempData["ErrorMessage"] = "This product is excluded from performance reporting for this commission period.";
             return RedirectToAction("Commission", new { commissionId });
         }
 

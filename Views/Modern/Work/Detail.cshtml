@@ -487,6 +487,10 @@
   </div>
 
   <!-- UPDATES TAB -->
+  @if (ViewBag.ShowWeeklyReporting as bool? == true)
+  {
+    @await Html.PartialAsync("_WorkItemWeeklyUpdatesTab", Model)
+  }
   @{
     var updatesList = Model.MonthlyUpdates?.OrderByDescending(m => m.ReportMonth).ToList() ?? new List<MonthlyUpdate>();
     var periodDueByKey = ViewBag.ReportingPeriodDueByKey as Dictionary<string, (DateTime DueDate, string Label)> ?? new Dictionary<string, (DateTime, string)>();

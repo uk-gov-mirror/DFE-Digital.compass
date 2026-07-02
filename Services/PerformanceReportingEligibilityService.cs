@@ -113,9 +113,10 @@ public class PerformanceReportingEligibilityService : IPerformanceReportingEligi
         string? fipsId,
         int year,
         int month,
-        PerformanceReportingEligibilityCache cache) =>
+        PerformanceReportingEligibilityCache cache,
+        string? cmdbSysId = null) =>
         cache.ProductExclusions.Any(e =>
-            ProductExclusionMatches(e, productDocumentId, fipsId) &&
+            ProductExclusionMatches(e, productDocumentId, fipsId, cmdbSysId) &&
             IsWithinExclusionRange(year, month, e));
 
     public bool IsProductExcludedForCommission(
@@ -123,14 +124,22 @@ public class PerformanceReportingEligibilityService : IPerformanceReportingEligi
         Commission commission,
         PerformanceReportingEligibilityCache cache)
     {
-        var start = new DateTime(commission.StartDate.Year, commission.StartDate.Month, 1);
-        var end = new DateTime(commission.EndDate.Year, commission.EndDate.Month, 1);
-        if (end < start)
-            end = start;
+        var rangeStart = new DateTime(commission.StartDate.Year, commission.StartDate.Month, 1);
+        // Commissions are often submitted after EndDate; exclusions effective during the open window must apply too.
+        var reportingEnd = commission.DueDate > commission.EndDate ? commission.DueDate : commission.EndDate;
+        var rangeEnd = new DateTime(reportingEnd.Year, reportingEnd.Month, 1);
+        if (rangeEnd < rangeStart)
+            rangeEnd = rangeStart;
 
-        for (var cursor = start; cursor <= end; cursor = cursor.AddMonths(1))
+        for (var cursor = rangeStart; cursor <= rangeEnd; cursor = cursor.AddMonths(1))
         {
-            if (IsProductExcluded(product.DocumentId, product.FipsId, cursor.Year, cursor.Month, cache))
+            if (IsProductExcluded(
+                    product.DocumentId,
+                    product.FipsId,
+                    cursor.Year,
+                    cursor.Month,
+                    cache,
+                    product.CmdbSysId))
                 return true;
         }
 
@@ -169,7 +178,8 @@ public class PerformanceReportingEligibilityService : IPerformanceReportingEligi
     private static bool ProductExclusionMatches(
         PerformanceReportingProductExclusion exclusion,
         string? productDocumentId,
-        string? fipsId)
+        string? fipsId,
+        string? cmdbSysId = null)
     {
         if (!string.IsNullOrWhiteSpace(productDocumentId) &&
             string.Equals(exclusion.ProductDocumentId, productDocumentId.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -178,6 +188,15 @@ public class PerformanceReportingEligibilityService : IPerformanceReportingEligi
         if (!string.IsNullOrWhiteSpace(fipsId) &&
             !string.IsNullOrWhiteSpace(exclusion.FipsId) &&
             string.Equals(exclusion.FipsId, fipsId.Trim(), StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (!string.IsNullOrWhiteSpace(cmdbSysId) &&
+            string.Equals(exclusion.ProductDocumentId, cmdbSysId.Trim(), StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Legacy rows may only have FIPS id populated on the exclusion record.
+        if (!string.IsNullOrWhiteSpace(fipsId) &&
+            string.Equals(exclusion.ProductDocumentId, fipsId.Trim(), StringComparison.OrdinalIgnoreCase))
             return true;
 
         return false;

@@ -44,6 +44,8 @@ public partial class ModernReportingController
         string source,
         int? year,
         int? month,
+        int? isoYear,
+        int? isoWeek,
         string? dimension,
         string? ba,
         string? filter,
@@ -56,6 +58,8 @@ public partial class ModernReportingController
             source,
             year,
             month,
+            isoYear,
+            isoWeek,
             dimension,
             ba,
             filter,
@@ -93,6 +97,8 @@ public partial class ModernReportingController
         string? source,
         int? year,
         int? month,
+        int? isoYear,
+        int? isoWeek,
         string? dimension,
         string? ba,
         string? filter,
@@ -135,6 +141,16 @@ public partial class ModernReportingController
                 groupId,
                 cancellationToken);
             sourceItems = ResolveResourcingDrillSourceItems(rr, dimension, ba);
+        }
+        else if (src == "weekly")
+        {
+            var model = await _monthlyReportService.BuildWeeklyDashboardAsync(
+                isoYear,
+                isoWeek,
+                businessAreaId,
+                directorateId,
+                cancellationToken);
+            sourceItems = ResolveDrillSourceItems(model.BusinessAreaRows, model.ScopeProjectItems, dimension, ba);
         }
         else
         {

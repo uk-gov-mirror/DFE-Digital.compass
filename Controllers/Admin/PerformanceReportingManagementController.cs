@@ -575,6 +575,8 @@ namespace Compass.Controllers.Admin
                 if (product != null)
                 {
                     model.ProductName = product.Title;
+                    if (string.IsNullOrWhiteSpace(model.ProductDocumentId))
+                        model.ProductDocumentId = product.DocumentId ?? model.FipsId ?? string.Empty;
                 }
 
                 model.CreatedBy = GetUserEmail();

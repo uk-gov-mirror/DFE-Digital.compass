@@ -84,6 +84,7 @@ public partial class ModernWorkController : Controller
     private readonly IWorkScopedExcelExportService _workScopedExcelExport;
     private readonly INotificationRuleService _notificationRuleService;
     private readonly IMonthlyUpdateService _monthlyUpdateService;
+    private readonly IWeeklyUpdateService _weeklyUpdateService;
     private readonly ILogger<ModernWorkController> _logger;
     private readonly IRaidRiskEditorFormService _raidRiskEditorForm;
     private readonly IRaidIssueEditorFormService _raidIssueEditorForm;
@@ -98,6 +99,7 @@ public partial class ModernWorkController : Controller
         IWorkScopedExcelExportService workScopedExcelExport,
         INotificationRuleService notificationRuleService,
         IMonthlyUpdateService monthlyUpdateService,
+        IWeeklyUpdateService weeklyUpdateService,
         ILogger<ModernWorkController> logger,
         IRaidRiskEditorFormService raidRiskEditorForm,
         IRaidIssueEditorFormService raidIssueEditorForm,
@@ -111,6 +113,7 @@ public partial class ModernWorkController : Controller
         _workScopedExcelExport = workScopedExcelExport;
         _notificationRuleService = notificationRuleService;
         _monthlyUpdateService = monthlyUpdateService;
+        _weeklyUpdateService = weeklyUpdateService;
         _logger = logger;
         _raidRiskEditorForm = raidRiskEditorForm;
         _raidIssueEditorForm = raidIssueEditorForm;
