@@ -24,6 +24,30 @@
   bool IsSubmittedView(CommissionSubmissionStatus s) =>
     s == CommissionSubmissionStatus.Submitted || s == CommissionSubmissionStatus.Late;
 
+  (string Href, string Text) ProductActionLink(CommissionSubmissionStatus status, string doc)
+  {
+    if (string.IsNullOrEmpty(doc))
+      return ("", "");
+
+    if (IsSubmittedView(status))
+    {
+      if (Model.IsPastDue)
+      {
+        return (
+          Url.Action("Submission", "ModernPerformance", new { commissionId = c.Id, documentId = doc, returnTab = Model.Tab }) ?? "#",
+          "View submission");
+      }
+
+      return (
+        Url.Action("CommissionSubmit", "ModernPerformance", new { commissionId = c.Id, documentId = doc, returnTab = Model.Tab }) ?? "#",
+        "Edit submission");
+    }
+
+    return (
+      Url.Action("CommissionSubmit", "ModernPerformance", new { commissionId = c.Id, documentId = doc, returnTab = Model.Tab }) ?? "#",
+      "Enter metrics");
+  }
+
   string ClearFiltersHref() =>
       Url.Action("Commission", "ModernPerformance", new { commissionId = c.Id, tab = Model.Tab }) ?? "#";
 }
@@ -248,13 +272,10 @@ else if (useGroups && grouped != null)
             <td class="govuk-table__cell">
               @if (!string.IsNullOrEmpty(doc))
               {
-                if (IsSubmittedView(r.Status))
+                var action = ProductActionLink(r.Status, doc);
+                if (!string.IsNullOrEmpty(action.Href))
                 {
- <a class="govuk-link govuk-link--no-visited-state" href="@Url.Action("Submission", "ModernPerformance", new { commissionId = c.Id, documentId = doc, returnTab = Model.Tab })">View submission</a>
-                }
-                else
-                {
- <a class="govuk-link govuk-link--no-visited-state" href="@Url.Action("CommissionSubmit", "ModernPerformance", new { commissionId = c.Id, documentId = doc, returnTab = Model.Tab })">Enter metrics</a>
+ <a class="govuk-link govuk-link--no-visited-state" href="@action.Href">@action.Text</a>
                 }
               }
             </td>
@@ -327,13 +348,10 @@ else
             <td class="govuk-table__cell">
               @if (!string.IsNullOrEmpty(doc))
               {
-                if (IsSubmittedView(r.Status))
+                var action = ProductActionLink(r.Status, doc);
+                if (!string.IsNullOrEmpty(action.Href))
                 {
- <a class="govuk-link govuk-link--no-visited-state" href="@Url.Action("Submission", "ModernPerformance", new { commissionId = c.Id, documentId = doc, returnTab = Model.Tab })">View submission</a>
-                }
-                else
-                {
- <a class="govuk-link govuk-link--no-visited-state" href="@Url.Action("CommissionSubmit", "ModernPerformance", new { commissionId = c.Id, documentId = doc, returnTab = Model.Tab })">Enter metrics</a>
+ <a class="govuk-link govuk-link--no-visited-state" href="@action.Href">@action.Text</a>
                 }
               }
             </td>
@@ -388,13 +406,10 @@ else
             <td class="govuk-table__cell">
               @if (!string.IsNullOrEmpty(doc))
               {
-                if (IsSubmittedView(r.Status))
+                var action = ProductActionLink(r.Status, doc);
+                if (!string.IsNullOrEmpty(action.Href))
                 {
- <a class="govuk-link govuk-link--no-visited-state" href="@Url.Action("Submission", "ModernPerformance", new { commissionId = c.Id, documentId = doc, returnTab = Model.Tab })">View submission</a>
-                }
-                else
-                {
- <a class="govuk-link govuk-link--no-visited-state" href="@Url.Action("CommissionSubmit", "ModernPerformance", new { commissionId = c.Id, documentId = doc, returnTab = Model.Tab })">Enter metrics</a>
+ <a class="govuk-link govuk-link--no-visited-state" href="@action.Href">@action.Text</a>
                 }
               }
             </td>

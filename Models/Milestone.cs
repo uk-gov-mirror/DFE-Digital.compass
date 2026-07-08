@@ -53,6 +53,11 @@ public class Milestone
     [MaxLength(20)]
     public string Status { get; set; } = "not_started"; // not_started, on_track, at_risk, delayed, complete, cancelled
 
+    public int? RagStatusLookupId { get; set; }
+
+    [ForeignKey(nameof(RagStatusLookupId))]
+    public RagStatusLookup? RagStatusLookup { get; set; }
+
     [Range(0, 100)]
     public int? ProgressPercent { get; set; }
 

@@ -1292,7 +1292,9 @@
   </div>
   </div>
  </div>
+ </div>
 
+      @await Html.PartialAsync("~/Views/Modern/Reporting/_MonthlyUpdateActiveWorkItemsSection.cshtml", m)
       @await Html.PartialAsync("~/Views/Modern/Reporting/_MonthlyUpdateIntelligenceSection.cshtml", m)
       @await Html.PartialAsync("~/Views/Modern/Reporting/_MonthlyUpdateRaidSection.cshtml", m)
       @await Html.PartialAsync("~/Views/Modern/Reporting/_MonthlyUpdateAccessibility.cshtml", m)
@@ -1325,7 +1327,7 @@
     justify-content: space-between;
     gap: 0.75rem 1rem;
     padding: 0.85rem 1rem;
-    background: var(--govuk-surface-background-colour, var(--surface-bg, #f4f8fb));
+    background: #fff;
     border: 1px solid var(--govuk-surface-border-colour, #8eb8dc);
     border-left: 4px solid #1d70b8;
   }
@@ -1341,6 +1343,30 @@
   }
   .mr-report-view-controls .govuk-button {
     margin-bottom: 0;
+  }
+  .mr-report-view-controls .govuk-button--secondary {
+    background-color: #00703c;
+    box-shadow: 0 2px 0 #002d18;
+    color: #fff;
+  }
+  .mr-report-view-controls .govuk-button--secondary:hover {
+    background-color: #005a30;
+  }
+  .mr-report-view-controls .govuk-button--secondary:focus {
+    background-color: #00703c;
+    color: #fff;
+  }
+  .mr-stat-card-jump {
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-decoration: none;
+  }
+  .mr-stat-card-jump:hover {
+    text-decoration: none;
   }
   @@media (max-width: 40.0625em) {
     .mr-report-view-controls__actions {

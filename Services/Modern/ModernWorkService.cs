@@ -850,7 +850,7 @@ public partial class ModernWorkService : IModernWorkService
             .Include(x => x.MonthlyUpdates).ThenInclude(mu => mu.CreatedByUser)
             .Include(x => x.MonthlyUpdates).ThenInclude(mu => mu.MonthlyUpdateNarratives)
             .Include(x => x.MonthlyUpdates).ThenInclude(mu => mu.DraftRagStatusLookup)
-            .Include(x => x.Milestones)
+            .Include(x => x.Milestones).ThenInclude(m => m.RagStatusLookup)
             .Include(x => x.RagStatusLookup)
             .Include(x => x.PhaseLookup)
             .Include(x => x.DeliveryPriority)

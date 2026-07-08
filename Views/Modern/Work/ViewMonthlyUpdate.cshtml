@@ -2,6 +2,7 @@
 @using Compass.Models.Modern.Work
 @{
     var work = ViewBag.WorkItem as WorkItem;
+    var reportMilestoneRows = ViewBag.ReportMilestoneRows as List<ReportMilestoneRowViewModel> ?? new List<ReportMilestoneRowViewModel>();
     var ragStatusesDict = ViewBag.RagStatusesDict as Dictionary<int, string> ?? new Dictionary<int, string>();
     var ragName = !string.IsNullOrWhiteSpace(Model.RagDisplayName)
         ? Model.RagDisplayName
@@ -145,6 +146,14 @@
  <div class="monthly-return-readonly-text govuk-body govuk-!-margin-bottom-0" id="monthly-return-narrative-body" aria-labelledby="monthly-return-narrative-heading" style="white-space:pre-wrap;">@Model.Narrative</div>
           }
         </section>
+
+        @await Html.PartialAsync("_ReportMilestonesSection", new ReportMilestonesSectionViewModel
+        {
+            SectionHeading = "Milestones",
+            SectionId = "monthly-return-milestones-heading",
+            IsReadOnly = true,
+            Milestones = reportMilestoneRows
+        })
 
         </div>
  </div>

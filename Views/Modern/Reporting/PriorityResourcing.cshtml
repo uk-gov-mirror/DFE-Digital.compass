@@ -1,0 +1,225 @@
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using Compass.Models.Modern.Work
+@using Compass.ViewModels.Modern
+@model ModernPriorityResourcingReportViewModel
+@{
+  ViewData["Title"] = "Priority resourcing report";
+  var r = Model ?? new ModernPriorityResourcingReportViewModel();
+  var jsonOpts = new JsonSerializerOptions
+  {
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+  };
+  var mwDetailPrefix = Url.Content("~/modern/work/detail/") ?? "/modern/work/detail/";
+  var exportBaseUrl = Url.Action("ExportWorkScope", "ModernReporting") ?? "";
+
+  var clientSections = r.Sections.Select(s => new
+  {
+    s.Key,
+    s.Title,
+    labels = s.Bars.Select(b => b.Priority).ToList(),
+    perm = s.Bars.Select(b => b.PermFte).ToList(),
+    msp = s.Bars.Select(b => b.MspFte).ToList(),
+    drill = s.Bars.ToDictionary(
+      b => b.Priority,
+      b => new
+      {
+        perm = b.PermWorkItemIds,
+        msp = b.MspWorkItemIds,
+        all = b.AllWorkItemIds
+      })
+  }).ToList();
+
+  var clientWorkItems = r.WorkItemsById.Values.ToDictionary(
+    w => w.WorkItemId.ToString(),
+    w => new
+    {
+      id = w.WorkItemId,
+      title = w.Title,
+      rag = string.IsNullOrWhiteSpace(w.Rag) ? "Not Set" : w.Rag,
+      priority = string.IsNullOrWhiteSpace(w.Priority) ? "Not set" : w.Priority,
+      permFte = w.PermFte,
+      mspFte = w.MspFte,
+      businessArea = w.BusinessArea,
+      directorates = w.Directorates
+    });
+
+  var clientPayload = new
+  {
+    sections = clientSections,
+    workItems = clientWorkItems,
+    workDetailPrefix = mwDetailPrefix,
+    exportBaseUrl
+  };
+  var clientJson = JsonSerializer.Serialize(clientPayload, jsonOpts);
+}
+
+@section Breadcrumbs {
+  <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Index", "ModernDashboard")">Home</a></li>
+  <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Dashboard", "ModernReporting")">Reporting</a></li>
+  <li class="govuk-breadcrumbs__list-item" aria-current="page">Priority resourcing report</li>
+}
+
+<div class="mr-dash priority-resourcing-report">
+  @{
+    var lede = await Html.PartialAsync("_ReportingMutedBodyLede", "Perm and MSC FTE declared in submitted monthly returns, charted by delivery priority. Select a directorate view, then click a bar to see matching work items.");
+  }
+  @await Html.PartialAsync("_ModernPageHeader", new ModernPageHeaderViewModel {
+    Caption = "Reporting",
+    Title = $"Priority resourcing — {r.MonthName}",
+    Lede = lede
+  })
+
+  @await Html.PartialAsync("_PriorityResourcingToolbar", r)
+
+  <div class="dfe-f-card-grid govuk-!-margin-bottom-4">
+    <div class="dfe-f-stat-card dfe-f-stat-card--tint-green">
+      <p class="govuk-body-s dfe-f-stat-card__label">Perm FTE</p>
+      <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@r.TotalPermFte.ToString("0.##")</p>
+    </div>
+    <div class="dfe-f-stat-card dfe-f-stat-card--tint-blue">
+      <p class="govuk-body-s dfe-f-stat-card__label">MSC FTE</p>
+      <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@r.TotalMspFte.ToString("0.##")</p>
+    </div>
+    <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey">
+      <p class="govuk-body-s dfe-f-stat-card__label">Work items with resources</p>
+      <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@r.SubmittedWorkItemCount</p>
+    </div>
+  </div>
+
+  @if (r.Sections.Count == 0 || r.SubmittedWorkItemCount == 0)
+  {
+    <div class="govuk-inset-text">
+      <p class="govuk-body govuk-!-margin-bottom-0">No submitted monthly returns with Perm or MSC FTE for this period and scope.</p>
+    </div>
+  }
+  else
+  {
+    <section class="govuk-!-margin-bottom-6" aria-labelledby="pr-chart-heading">
+      <h2 id="pr-chart-heading" class="govuk-heading-m">FTE by priority</h2>
+      <p class="govuk-body-s govuk-hint govuk-!-margin-bottom-3">Grouped bars show Perm (green) and MSC (blue) FTE side by side for each priority. Click a bar to view work items below.</p>
+
+      <div class="pr-directorate-tabs govuk-!-margin-bottom-3" role="tablist" aria-label="Directorate views" id="pr-directorate-tabs">
+        @foreach (var chartSection in r.Sections)
+        {
+          var isFirst = chartSection == r.Sections[0];
+          <button type="button"
+                  class="pr-directorate-tabs__btn@(isFirst ? " pr-directorate-tabs__btn--active" : "")"
+                  role="tab"
+                  aria-selected="@(isFirst ? "true" : "false")"
+                  aria-controls="pr-chart-panel"
+                  data-pr-section="@chartSection.Key"
+                  id="pr-tab-@chartSection.Key">
+            @chartSection.Title
+          </button>
+        }
+      </div>
+
+      <div class="pr-chart-card" id="pr-chart-panel" role="tabpanel">
+        <div class="pr-chart-wrap">
+          <canvas id="pr-priority-chart" aria-label="FTE by delivery priority chart"></canvas>
+        </div>
+      </div>
+
+      <div id="pr-drill-panel" class="pr-drill-panel govuk-!-margin-top-4" hidden>
+        <div class="pr-drill-panel__header">
+          <h3 class="govuk-heading-s govuk-!-margin-bottom-0" id="pr-drill-title"></h3>
+          <div class="pr-drill-panel__actions">
+            <a href="#" class="govuk-link govuk-link--no-visited-state govuk-body-s" id="pr-drill-export" hidden data-report-download data-generating-modal-title="Generating work export">Export workbook</a>
+            <button type="button" class="pr-drill-panel__close" id="pr-drill-close" aria-label="Close work items table">&times;</button>
+          </div>
+        </div>
+        <p class="govuk-body-s govuk-hint govuk-!-margin-top-2 govuk-!-margin-bottom-2" id="pr-drill-caption"></p>
+        <div class="dfe-f-table-wrapper" data-module="dfe-f-table">
+          <div class="govuk-visually-hidden" aria-live="polite" data-dfe-table-sort-live></div>
+          <table class="govuk-table govuk-table--small-text-until-tablet dfe-f-table--condensed" id="pr-drill-table">
+            <thead class="govuk-table__head">
+              <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Work item</button></th>
+                <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">RAG</button></th>
+                <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Priority</button></th>
+                <th scope="col" class="govuk-table__header govuk-table__header--numeric" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Perm FTE</button></th>
+                <th scope="col" class="govuk-table__header govuk-table__header--numeric" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">MSC FTE</button></th>
+                <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Business area</button></th>
+                <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Directorate</button></th>
+              </tr>
+            </thead>
+            <tbody class="govuk-table__body" id="pr-drill-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  }
+</div>
+
+@section Styles {
+  @await Html.PartialAsync("_MrReportCoreStyles")
+  <style>
+    .pr-directorate-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .pr-directorate-tabs__btn {
+      border: 1px solid #b1b4b6;
+      background: #f3f2f1;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #0b0c0c;
+      line-height: 1.3;
+    }
+    .pr-directorate-tabs__btn--active {
+      background: #1d70b8;
+      border-color: #1d70b8;
+      color: #fff;
+    }
+    .pr-chart-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      padding: 1rem 1.25rem;
+    }
+    .pr-chart-wrap {
+      height: 22rem;
+      position: relative;
+    }
+    .pr-drill-panel {
+      border: 1px solid #b1b4b6;
+      padding: 1rem 1.25rem;
+      background: #fff;
+    }
+    .pr-drill-panel__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    .pr-drill-panel__actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .pr-drill-panel__close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0 0.25rem;
+      line-height: 1;
+      color: #505a5f;
+    }
+    .pr-drill-panel__close:hover { color: #0b0c0c; }
+  </style>
+}
+
+@section Scripts {
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" nonce="@Context.Items["Nonce"]"></script>
+  <script src="@Url.Content("~/modern/js/priority-resourcing-report.js")" asp-append-version="true" nonce="@Context.Items["Nonce"]"></script>
+  <script nonce="@Context.Items["Nonce"]">
+    if (window.PriorityResourcingReport) {
+      window.PriorityResourcingReport.init(@Html.Raw(clientJson));
+    }
+  </script>
+}
