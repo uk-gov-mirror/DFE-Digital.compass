@@ -36,7 +36,7 @@ public partial class ModernWorkService
             .Include(x => x.MonthlyUpdates).ThenInclude(mu => mu.MonthlyUpdateNarratives)
             .Include(x => x.MonthlyUpdates).ThenInclude(mu => mu.DraftRagStatusLookup)
             .Include(x => x.WeeklyWorkUpdates).ThenInclude(wu => wu.DraftRagStatusLookup)
-            .Include(x => x.Milestones)
+            .Include(x => x.Milestones).ThenInclude(m => m.RagStatusLookup)
             .Include(x => x.Risks).ThenInclude(r => r.OwnerUser)
             .Include(x => x.Risks).ThenInclude(r => r.RiskTier)
             .Include(x => x.Risks).ThenInclude(r => r.RiskStatus)

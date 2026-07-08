@@ -304,6 +304,7 @@ public partial class CompassDbContext : DbContext
     public DbSet<MilestoneRisk> MilestoneRisks { get; set; }
     public DbSet<MilestoneIssue> MilestoneIssues { get; set; }
     public DbSet<MilestoneUpdate> MilestoneUpdates { get; set; }
+    public DbSet<WorkUpdateMilestoneEntry> WorkUpdateMilestoneEntries { get; set; }
 
     // Demand Triage (spec-aligned v3)
     public DbSet<DemandTriageRequest> DemandTriageRequests { get; set; }
@@ -1578,6 +1579,48 @@ public partial class CompassDbContext : DbContext
 
         modelBuilder.Entity<Milestone>()
             .HasIndex(m => m.DueDate);
+
+        modelBuilder.Entity<Milestone>()
+            .HasOne(m => m.RagStatusLookup)
+            .WithMany()
+            .HasForeignKey(m => m.RagStatusLookupId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Milestone>()
+            .HasIndex(m => m.RagStatusLookupId);
+
+        modelBuilder.Entity<WorkUpdateMilestoneEntry>()
+            .HasOne(e => e.Milestone)
+            .WithMany()
+            .HasForeignKey(e => e.MilestoneId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<WorkUpdateMilestoneEntry>()
+            .HasOne(e => e.RagStatusLookup)
+            .WithMany()
+            .HasForeignKey(e => e.RagStatusLookupId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<WorkUpdateMilestoneEntry>()
+            .HasOne(e => e.ProjectMonthlyUpdate)
+            .WithMany()
+            .HasForeignKey(e => e.ProjectMonthlyUpdateId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<WorkUpdateMilestoneEntry>()
+            .HasOne(e => e.ProjectWeeklyWorkUpdate)
+            .WithMany()
+            .HasForeignKey(e => e.ProjectWeeklyWorkUpdateId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<WorkUpdateMilestoneEntry>()
+            .HasIndex(e => e.MilestoneId);
+
+        modelBuilder.Entity<WorkUpdateMilestoneEntry>()
+            .HasIndex(e => e.ProjectMonthlyUpdateId);
+
+        modelBuilder.Entity<WorkUpdateMilestoneEntry>()
+            .HasIndex(e => e.ProjectWeeklyWorkUpdateId);
 
         // KPI configuration
         modelBuilder.Entity<Kpi>()

@@ -456,13 +456,20 @@ public class ModernPerformanceController : Controller
             })
             .ToList();
 
+        var now = DateTime.UtcNow;
+        var isPastDue = now > commission.DueDate;
+        var delegatedUnlock =
+            await CurrentUserMayOverridePerformanceCommissionLocksAsync(product, cancellationToken);
+
         var vm = new ModernPerformanceSubmissionViewModel
         {
             Commission = commission,
             Product = product,
             Submission = submission,
             ReturnTab = returnTabNorm,
-            MetricRows = metricRows
+            MetricRows = metricRows,
+            IsPastDue = isPastDue,
+            CanReopen = !isPastDue || delegatedUnlock
         };
 
         return View(vm);

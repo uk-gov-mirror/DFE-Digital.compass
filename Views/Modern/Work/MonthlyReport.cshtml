@@ -240,6 +240,15 @@
                 </div>
             </div>
 
+            @await Html.PartialAsync("_ReportMilestonesSection", new ReportMilestonesSectionViewModel
+            {
+                SectionHeading = "Milestones",
+                SectionId = "monthly-report-milestones-heading",
+                IsReadOnly = isReadOnly,
+                Milestones = Model.Milestones,
+                RagStatuses = Model.RagStatuses
+            })
+
             @if (!isReadOnly)
             {
  <div class="dfe-c-button-group">

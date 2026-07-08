@@ -268,7 +268,7 @@ public static class FipsProductListingHelper
     }
 
     /// <summary>
-    /// Products where the user is a CMDB contact — same set as <c>/modern/manage/fips/products?tab=my</c>.
+    /// Operational products where the user is a CMDB contact — active status only, excluding decommissioned phases.
     /// Used by the modern home dashboard when the FIPS service register is enabled.
     /// </summary>
     public static async Task<List<ProductDto>> BuildMyProductDtosForDashboardAsync(
@@ -290,16 +290,17 @@ public static class FipsProductListingHelper
             categorisationGroupId: null,
             cancellationToken);
 
-        if (vm.Products.Count == 0)
+        var operationalProducts = vm.Products.Where(IsOperationalDashboardProduct).ToList();
+        if (operationalProducts.Count == 0)
             return [];
 
-        var ids = vm.Products.Select(p => p.Id).ToList();
+        var ids = operationalProducts.Select(p => p.Id).ToList();
         var cmdbKeys = await context.CMDBProducts.AsNoTracking()
             .Where(p => ids.Contains(p.Id))
             .Select(p => new { p.Id, p.CMDBID })
             .ToDictionaryAsync(p => p.Id, p => p.CMDBID, cancellationToken);
 
-        return vm.Products
+        return operationalProducts
             .Select(row =>
             {
                 cmdbKeys.TryGetValue(row.Id, out var cmdbId);
@@ -341,10 +342,11 @@ public static class FipsProductListingHelper
             categorisationGroupId: null,
             cancellationToken);
 
-        if (vm.Products.Count == 0)
+        var operationalProducts = vm.Products.Where(IsOperationalDashboardProduct).ToList();
+        if (operationalProducts.Count == 0)
             return [];
 
-        var ids = vm.Products.Select(p => p.Id).ToList();
+        var ids = operationalProducts.Select(p => p.Id).ToList();
         var products = await context.CMDBProducts.AsNoTracking()
             .Include(p => p.Phase)
             .Include(p => p.BusinessAreas)
@@ -574,6 +576,17 @@ public static class FipsProductListingHelper
 
         return map;
     }
+
+    /// <summary>
+    /// Home dashboard: user's products that are still operational (status Active, not decommissioned phase).
+    /// </summary>
+    private static bool IsOperationalDashboardProduct(FipsProductRow row) =>
+        row.Status == CMDBProductStatus.Active && !IsDecommissionedPhase(row.PhaseName);
+
+    private static bool IsDecommissionedPhase(string? phaseName) =>
+        !string.IsNullOrWhiteSpace(phaseName) &&
+        (phaseName.Equals("Decommissioned", StringComparison.OrdinalIgnoreCase) ||
+         phaseName.Equals("Decommissioning", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Active tab: status Active, not flagged as enterprise (enterprise tab holds those).</summary>
     private static IQueryable<CMDBProduct> ActiveProducts(IQueryable<CMDBProduct> query) =>

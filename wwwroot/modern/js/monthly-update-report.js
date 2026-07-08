@@ -7,6 +7,7 @@
   var DEFAULT_ORDER = [
     'submission',
     'intelligence',
+    'active-work-items',
     'business-area',
     'changes',
     'trends',
@@ -204,6 +205,22 @@
       applyDefaultSectionExpandedState(reportGroup);
     }
     bindExpandedPersistence(reportGroup);
+
+    function jumpToSection(sectionId) {
+      if (!sectionId) return;
+      var panel = reportGroup.querySelector('[data-mr-section-id="' + sectionId + '"]');
+      if (!panel) return;
+      var setExpanded = setToggleExpandedFn();
+      if (setExpanded) setExpanded(panel, true);
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      persistExpandedState(reportGroup);
+    }
+
+    document.querySelectorAll('[data-mr-jump-section]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        jumpToSection(el.getAttribute('data-mr-jump-section'));
+      });
+    });
 
     var draftOrder = currentOrder.slice();
     var editing = false;

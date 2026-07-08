@@ -35,6 +35,8 @@ public class WeeklyReportViewModel
 
     public List<RagStatus> RagStatuses { get; set; } = new();
 
+    public List<ReportMilestoneRowViewModel> Milestones { get; set; } = new();
+
     public WeeklyReportPreviousSubmission? PreviousWeekSubmission { get; set; }
 }
 

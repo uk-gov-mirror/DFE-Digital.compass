@@ -29,6 +29,24 @@
   Tab = Model.ReturnTab
 })
 
+@if (TempData["ErrorMessage"] != null)
+{
+ <div class="govuk-error-summary govuk-!-margin-bottom-3" role="alert"><p class="govuk-body">@TempData["ErrorMessage"]</p></div>
+}
+@if (TempData["SuccessMessage"] != null)
+{
+ <div class="govuk-notification-banner govuk-notification-banner--success govuk-!-margin-bottom-3" role="region">
+ <div class="govuk-notification-banner__content"><p class="govuk-body">@TempData["SuccessMessage"]</p></div>
+  </div>
+}
+
+@if (Model.CanReopen)
+{
+ <div class="govuk-inset-text govuk-!-margin-top-4">
+  <p class="govuk-body govuk-!-margin-bottom-0">This return has been submitted. You can unsubmit it to edit metrics and submit again while the reporting window is open.</p>
+ </div>
+}
+
 <h2 class="govuk-heading-m govuk-!-margin-top-6">Metrics</h2>
 @if (Model.MetricRows.Count == 0)
 {
@@ -104,4 +122,22 @@ else
 else
 {
  <div class="govuk-inset-text govuk-!-margin-top-2" style="white-space: pre-wrap;">@Model.Submission.Comments</div>
+}
+
+@if (Model.CanReopen)
+{
+ <div class="govuk-button-group govuk-!-margin-top-6">
+  <form method="post" asp-controller="ModernPerformance" asp-action="CommissionUnsubmit"
+        data-confirm-title="Unsubmit this return?"
+        data-confirm-message="You will be able to edit metrics and submit again.">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" value="@Model.Submission.Id" />
+    <input type="hidden" name="returnTab" value="@Model.ReturnTab" />
+    <button type="submit" class="govuk-button govuk-button--warning">Unsubmit to edit</button>
+  </form>
+ </div>
+}
+else if (Model.IsPastDue)
+{
+ <p class="govuk-body dfe-c-text-muted govuk-!-margin-top-6">This submission is locked because the commission due date has passed.</p>
 }
