@@ -80,6 +80,11 @@ public class ModernPerformanceSubmissionViewModel
     public string ReturnTab { get; set; } = "mine";
 
     public List<ModernPerformanceSubmissionMetricRow> MetricRows { get; set; } = new();
+
+    public bool IsPastDue { get; set; }
+
+    /// <summary>Whether the user can unsubmit and edit (reporting window open, or delegated override).</summary>
+    public bool CanReopen { get; set; }
 }
 
 public class ModernPerformanceSubmissionMetricRow

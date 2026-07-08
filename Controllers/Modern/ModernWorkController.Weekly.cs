@@ -2,6 +2,7 @@ using System.Globalization;
 using Compass.Models;
 using Compass.Models.Modern.Work;
 using Compass.Services;
+using Compass.Services.Modern;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
@@ -99,6 +100,8 @@ public partial class ModernWorkController
         ViewBag.PeriodDueDate = _weeklyUpdateService.GetWeeklyUpdateDueDate(wu.IsoYear, wu.IsoWeek);
         ViewBag.CanUnsubmit = wu.SubmittedAt.HasValue &&
             DateTime.UtcNow.Date <= _weeklyUpdateService.GetWeeklyUpdateDueDate(wu.IsoYear, wu.IsoWeek).Date;
+        ViewBag.ReportMilestoneRows = await MilestoneReportHelper.LoadSubmittedMilestoneRowsAsync(
+            _context, null, wu.Id, cancellationToken);
         ViewBag.WorkChromeSubPage = false;
         ViewBag.WorkChromeMinimalHeader = false;
 
@@ -124,6 +127,9 @@ public partial class ModernWorkController
         int id, int year, int week,
         string? narrative, string? peopleNarrative, decimal? permFte, decimal? mspFte,
         int? ragStatusId, string? ragJustification, string? pathToGreen,
+        [FromForm] Dictionary<int, string>? milestoneStatus,
+        [FromForm] Dictionary<int, int?>? milestoneRagStatusId,
+        [FromForm] Dictionary<int, string>? milestoneUpdateNote,
         string? command,
         CancellationToken cancellationToken = default)
     {
@@ -172,17 +178,32 @@ public partial class ModernWorkController
                 .FirstOrDefaultAsync(r => r.Id == ridPost && r.IsActive, cancellationToken);
         }
 
+        var existingDraft = await _context.ProjectWeeklyWorkUpdates.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ProjectId == id && m.IsoYear == year && m.IsoWeek == week, cancellationToken);
+        var milestoneRows = await ResolveWeeklyReportMilestoneRowsAsync(
+            id,
+            existingDraft?.Id,
+            milestoneStatus,
+            milestoneRagStatusId,
+            milestoneUpdateNote,
+            cancellationToken);
+        var activeRagById = await MilestoneReportHelper.LoadActiveRagLookupsAsync(_context, cancellationToken);
+
         ValidateWeeklyReportForm(
             ModelState, isSubmit, narrative, peopleNarrative, permFte, mspFte,
             ragStatusId, resolvedRag, ragJustification, pathToGreen);
 
+        MilestoneReportHelper.ValidatePostedMilestones(ModelState, isSubmit, milestoneRows, activeRagById);
+
         if (!ModelState.IsValid)
         {
             var posted = new WeeklyReportPostedForm(
-                narrative, peopleNarrative, permFte, mspFte, ragStatusId, ragJustification, pathToGreen);
+                narrative, peopleNarrative, permFte, mspFte, ragStatusId, ragJustification, pathToGreen,
+                milestoneStatus, milestoneRagStatusId, milestoneUpdateNote);
             var vmInvalid = await LoadWeeklyReportViewModelAsync(id, year, week, posted, cancellationToken);
             if (vmInvalid == null)
                 return NotFound();
+            vmInvalid.Milestones = milestoneRows;
             return await WeeklyReportViewResultAsync(vmInvalid, cancellationToken);
         }
 
@@ -249,6 +270,17 @@ public partial class ModernWorkController
         project.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
 
+        await MilestoneReportHelper.PersistMilestoneEntriesForWeeklyUpdateAsync(
+            _context,
+            id,
+            update.Id,
+            milestoneRows,
+            activeRagById,
+            userEmail,
+            currentUser?.Name,
+            cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+
         TempData["WeeklyReportMessage"] = isSubmit
             ? "Weekly update submitted successfully."
             : "Weekly update saved as draft.";
@@ -295,7 +327,10 @@ public partial class ModernWorkController
         decimal? MspFte,
         int? RagStatusId,
         string? RagJustification,
-        string? PathToGreen);
+        string? PathToGreen,
+        Dictionary<int, string>? MilestoneStatus = null,
+        Dictionary<int, int?>? MilestoneRagStatusId = null,
+        Dictionary<int, string>? MilestoneUpdateNote = null);
 
     private static void ValidateWeeklyReportForm(
         ModelStateDictionary modelState,
@@ -432,7 +467,37 @@ public partial class ModernWorkController
         }
 
         vm.PreviousWeekSubmission = await TryLoadPreviousWeekSubmissionAsync(id, year, week, ragHistDesc, cancellationToken);
+
+        vm.Milestones = await MilestoneReportHelper.LoadReportMilestoneRowsAsync(
+            _context, id, null, update?.Id, cancellationToken);
+
+        if (posted != null)
+        {
+            var activeRagById = await MilestoneReportHelper.LoadActiveRagLookupsAsync(_context, cancellationToken);
+            vm.Milestones = MilestoneReportHelper.ApplyPostedMilestoneRows(
+                vm.Milestones,
+                posted.MilestoneStatus,
+                posted.MilestoneRagStatusId,
+                posted.MilestoneUpdateNote,
+                activeRagById);
+        }
+
         return vm;
+    }
+
+    private async Task<List<ReportMilestoneRowViewModel>> ResolveWeeklyReportMilestoneRowsAsync(
+        int projectId,
+        int? weeklyUpdateId,
+        Dictionary<int, string>? postedStatus,
+        Dictionary<int, int?>? postedRagStatusId,
+        Dictionary<int, string>? postedUpdateNote,
+        CancellationToken cancellationToken)
+    {
+        var baseline = await MilestoneReportHelper.LoadReportMilestoneRowsAsync(
+            _context, projectId, null, weeklyUpdateId, cancellationToken);
+        var activeRagById = await MilestoneReportHelper.LoadActiveRagLookupsAsync(_context, cancellationToken);
+        return MilestoneReportHelper.ApplyPostedMilestoneRows(
+            baseline, postedStatus, postedRagStatusId, postedUpdateNote, activeRagById);
     }
 
     private async Task<WeeklyReportPreviousSubmission?> TryLoadPreviousWeekSubmissionAsync(

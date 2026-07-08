@@ -60,6 +60,11 @@
         Href = Url.Action("Resourcing", "ModernReporting") ?? "#",
         Description = "FTE and MSC totals by directorate, business area, and work item with configurable resource bands and monthly trend."
       })
+      @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingDashboardCard.cshtml", new ReportingDashboardCardViewModel {
+        Title = "Priority resourcing",
+        Href = Url.Action("PriorityResourcing", "ModernReporting") ?? "#",
+        Description = "Perm and MSC FTE from monthly returns, charted by delivery priority with directorate breakdown and work item drill-down."
+      })
     </div>
   </section>
 

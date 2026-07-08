@@ -30,6 +30,10 @@ public class MilestoneUpdate
     [Range(0, 100)]
     public int? NewProgress { get; set; }
 
+    public int? PreviousRagStatusLookupId { get; set; }
+
+    public int? NewRagStatusLookupId { get; set; }
+
     [Required]
     [MaxLength(255)]
     public string UpdatedByEmail { get; set; } = string.Empty;

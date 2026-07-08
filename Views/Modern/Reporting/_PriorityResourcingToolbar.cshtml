@@ -1,0 +1,65 @@
+@model Compass.ViewModels.Modern.ModernPriorityResourcingReportViewModel
+@{
+  var r = Model;
+  var maxY = r.MaxReportYear >= r.MinReportYear ? r.MaxReportYear : DateTime.UtcNow.Year;
+  var minY = r.MinReportYear;
+  if (maxY < minY) { maxY = minY; }
+
+  string NavUrl(int? y, int? mo) =>
+    Url.Action("PriorityResourcing", "ModernReporting", new
+    {
+      year = y,
+      month = mo,
+      businessAreaId = r.FilterBusinessAreaId,
+      directorateId = r.FilterDirectorateId
+    }) ?? "#";
+}
+
+<div class="mr-toolbar mr-toolbar--compact govuk-!-margin-bottom-3">
+  <div class="mr-toolbar__row">
+    <div class="mr-toolbar__nav mr-toolbar__nav--compact">
+      @if (r.HasPreviousMonthNav && r.PreviousNavYear.HasValue && r.PreviousNavMonth.HasValue)
+      {
+        <a class="govuk-link mr-toolbar__nav-link govuk-link--no-visited-state" href="@NavUrl(r.PreviousNavYear, r.PreviousNavMonth)">← @(new DateTime(r.PreviousNavYear.Value, r.PreviousNavMonth.Value, 1).ToString("MMM yy"))</a>
+      }
+      <span class="mr-toolbar__period">@r.MonthName</span>
+      @if (r.HasNextMonthNav && r.NextNavYear.HasValue && r.NextNavMonth.HasValue)
+      {
+        <a class="govuk-link mr-toolbar__nav-link govuk-link--no-visited-state" href="@NavUrl(r.NextNavYear, r.NextNavMonth)">@(new DateTime(r.NextNavYear.Value, r.NextNavMonth.Value, 1).ToString("MMM yy")) →</a>
+      }
+    </div>
+    <form method="get" action="@Url.Action("PriorityResourcing", "ModernReporting")" class="mr-toolbar__filters mr-toolbar__filters--compact" data-page-loading>
+      <select name="year" class="govuk-select mr-toolbar__filter--year" aria-label="Year">
+        @for (var y = maxY; y >= minY; y--)
+        {
+          if (r.ReportYear == y) { <option value="@y" selected>@y</option> }
+          else { <option value="@y">@y</option> }
+        }
+      </select>
+      <select name="month" class="govuk-select mr-toolbar__filter--month" aria-label="Month">
+        @for (var mo = 1; mo <= 12; mo++)
+        {
+          if (r.ReportMonth == mo) { <option value="@mo" selected>@(new DateTime(2000, mo, 1).ToString("MMM"))</option> }
+          else { <option value="@mo">@(new DateTime(2000, mo, 1).ToString("MMM"))</option> }
+        }
+      </select>
+      <select name="businessAreaId" class="govuk-select mr-toolbar__filter--business-area" aria-label="Business area">
+        <option value="">All areas</option>
+        @foreach (var ba in r.BusinessAreas)
+        {
+          if (r.FilterBusinessAreaId == ba.Id) { <option value="@ba.Id" selected>@ba.Name</option> }
+          else { <option value="@ba.Id">@ba.Name</option> }
+        }
+      </select>
+      <select name="directorateId" class="govuk-select mr-toolbar__filter--directorate" aria-label="Directorate">
+        <option value="">All directorates</option>
+        @foreach (var d in r.Directorates)
+        {
+          if (r.FilterDirectorateId == d.Id) { <option value="@d.Id" selected>@d.Name</option> }
+          else { <option value="@d.Id">@d.Name</option> }
+        }
+      </select>
+      <button type="submit" class="govuk-button mr-toolbar__filter--apply govuk-!-margin-bottom-0">Apply</button>
+    </form>
+  </div>
+</div>

@@ -46,6 +46,9 @@ public class MonthlyReportViewModel
 
     public List<RagStatus> RagStatuses { get; set; } = new();
 
+    /// <summary>In-progress milestones for status and RAG updates during this reporting period.</summary>
+    public List<ReportMilestoneRowViewModel> Milestones { get; set; } = new();
+
     /// <summary>Submitted return for the calendar month before <see cref="Year"/>/<see cref="Month"/>, when one exists.</summary>
     public MonthlyReportPreviousSubmission? PreviousMonthSubmission { get; set; }
 }

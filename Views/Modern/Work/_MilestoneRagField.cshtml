@@ -1,0 +1,36 @@
+@model Compass.Models.Modern.Work.MilestoneRagFieldViewModel
+@using Compass.Models.Modern.Work
+@{
+    var fieldId = $"milestone-rag-{Model.FieldNamePrefix}";
+    var hasError = ViewData.ModelState[Model.FieldName]?.Errors?.Any() == true;
+    var errorMsg = ViewData.ModelState[Model.FieldName]?.Errors?.FirstOrDefault()?.ErrorMessage;
+}
+
+<div class="govuk-form-group @(hasError ? "govuk-form-group--error" : "")" id="@fieldId">
+    <fieldset class="govuk-fieldset" aria-describedby="@($"{fieldId}-hint")">
+        <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">RAG status</legend>
+        <div class="govuk-hint" id="@($"{fieldId}-hint")">Delivery confidence for this milestone (same RAG scale as monthly reporting).</div>
+        @if (hasError)
+        {
+            <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@errorMsg</p>
+        }
+        <div class="govuk-radios @(hasError ? "govuk-radios--error" : "")" data-module="govuk-radios">
+            <div class="govuk-radios__item">
+                <input class="govuk-radios__input" id="@($"{fieldId}-none")" name="@Model.FieldName" type="radio" value="" @(!Model.SelectedRagStatusId.HasValue ? "checked" : "") />
+                <label class="govuk-label govuk-radios__label" for="@($"{fieldId}-none")">Not set</label>
+            </div>
+            @foreach (var rag in Model.RagStatuses)
+            {
+                var inputId = $"{fieldId}-{rag.Id}";
+                <div class="govuk-radios__item">
+                    <input class="govuk-radios__input" id="@inputId" name="@Model.FieldName" type="radio" value="@rag.Id" @(Model.SelectedRagStatusId == rag.Id ? "checked" : "") />
+                    <label class="govuk-label govuk-radios__label" for="@inputId">@rag.Name</label>
+                    @if (!string.IsNullOrEmpty(rag.Description))
+                    {
+                        <div class="govuk-hint govuk-radios__hint">@rag.Description</div>
+                    }
+                </div>
+            }
+        </div>
+    </fieldset>
+</div>
