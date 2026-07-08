@@ -14,5 +14,6 @@ public interface IHomeDashboardViewModelBuilder
         string userEmail,
         UserPreference preference,
         IUrlHelper url,
-        HttpContext httpContext);
+        HttpContext httpContext,
+        bool showRaidIssues = true);
 }

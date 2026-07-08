@@ -1,0 +1,115 @@
+@model Compass.Models.Modern.Work.WeeklyReportPreviousSubmission
+@using Compass.Models.Modern.Work
+<div class="dfe-f-toggle govuk-!-margin-bottom-6" data-module="dfe-f-toggle" id="weekly-report-last-week-toggle">
+    <div class="dfe-f-toggle__title-wrapper">
+        <h2 class="dfe-f-toggle__heading govuk-!-margin-bottom-0">
+            <button type="button"
+                    class="dfe-f-toggle__button"
+                    id="weekly-report-last-week-toggle-btn"
+                    aria-expanded="false"
+                    aria-controls="weekly-report-last-week-panel">
+                <span class="dfe-f-toggle__icon" aria-hidden="true"></span>
+                <span class="dfe-f-toggle__title">Last week</span>
+            </button>
+        </h2>
+    </div>
+    <div id="weekly-report-last-week-panel" class="dfe-f-toggle__content" hidden>
+        <div class="dfe-f-toggle__body">
+            <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-0">
+                <div class="govuk-summary-list__row govuk-summary-list__row--no-actions">
+                    <dt class="govuk-summary-list__key">Reporting period</dt>
+                    <dd class="govuk-summary-list__value">@Model.PeriodLabel</dd>
+                </div>
+                @if (Model.SubmittedAt.HasValue)
+                {
+                    <div class="govuk-summary-list__row govuk-summary-list__row--no-actions">
+                        <dt class="govuk-summary-list__key">Submitted</dt>
+                        <dd class="govuk-summary-list__value">
+                            @Model.SubmittedAt.Value.ToString("d MMMM yyyy 'at' HH:mm")
+                            @if (!string.IsNullOrWhiteSpace(Model.SubmittedByName))
+                            {
+                                <span class="govuk-body-s govuk-!-display-block govuk-!-margin-top-1">by @Model.SubmittedByName</span>
+                            }
+                        </dd>
+                    </div>
+                }
+                <div class="govuk-summary-list__row govuk-summary-list__row--no-actions">
+                    <dt class="govuk-summary-list__key">Permanent FTE</dt>
+                    <dd class="govuk-summary-list__value">@(Model.PermFte?.ToString("0.##") ?? "—")</dd>
+                </div>
+                <div class="govuk-summary-list__row govuk-summary-list__row--no-actions">
+                    <dt class="govuk-summary-list__key">MSC number</dt>
+                    <dd class="govuk-summary-list__value">@(Model.MspFte?.ToString("0.##") ?? "—")</dd>
+                </div>
+                <div class="govuk-summary-list__row govuk-summary-list__row--no-actions">
+                    <dt class="govuk-summary-list__key">Narrative on people this week</dt>
+                    <dd class="govuk-summary-list__value">
+                        @if (string.IsNullOrWhiteSpace(Model.PeopleNarrative))
+                        {
+                            <span class="govuk-hint govuk-!-margin-bottom-0">Not provided</span>
+                        }
+                        else
+                        {
+                            <span class="govuk-body" style="white-space:pre-wrap;">@Model.PeopleNarrative</span>
+                        }
+                    </dd>
+                </div>
+                <div class="govuk-summary-list__row govuk-summary-list__row--no-actions">
+                    <dt class="govuk-summary-list__key">Overall weekly update narrative</dt>
+                    <dd class="govuk-summary-list__value">
+                        @if (string.IsNullOrWhiteSpace(Model.Narrative))
+                        {
+                            <span class="govuk-hint govuk-!-margin-bottom-0">Not provided</span>
+                        }
+                        else
+                        {
+                            <span class="govuk-body" style="white-space:pre-wrap;">@Model.Narrative</span>
+                        }
+                    </dd>
+                </div>
+                <div class="govuk-summary-list__row govuk-summary-list__row--no-actions">
+                    <dt class="govuk-summary-list__key">RAG</dt>
+                    <dd class="govuk-summary-list__value">
+                        @if (string.IsNullOrWhiteSpace(Model.RagName))
+                        {
+                            <span class="govuk-hint govuk-!-margin-bottom-0">Not provided</span>
+                        }
+                        else
+                        {
+                            <span class="@WorkBadgeCss.RagCompactBadgeClass(Model.RagName)">@Model.RagName.ToUpperInvariant()</span>
+                        }
+                    </dd>
+                </div>
+                <div class="govuk-summary-list__row govuk-summary-list__row--no-actions">
+                    <dt class="govuk-summary-list__key">Justification</dt>
+                    <dd class="govuk-summary-list__value">
+                        @if (string.IsNullOrWhiteSpace(Model.RagJustification))
+                        {
+                            <span class="govuk-hint govuk-!-margin-bottom-0">Not provided</span>
+                        }
+                        else
+                        {
+                            <span class="govuk-body" style="white-space:pre-wrap;">@Model.RagJustification</span>
+                        }
+                    </dd>
+                </div>
+                @if (!Model.IsGreenRag)
+                {
+                    <div class="govuk-summary-list__row govuk-summary-list__row--no-actions">
+                        <dt class="govuk-summary-list__key">Path to green</dt>
+                        <dd class="govuk-summary-list__value">
+                            @if (string.IsNullOrWhiteSpace(Model.PathToGreen))
+                            {
+                                <span class="govuk-hint govuk-!-margin-bottom-0">Not provided</span>
+                            }
+                            else
+                            {
+                                <span class="govuk-body" style="white-space:pre-wrap;">@Model.PathToGreen</span>
+                            }
+                        </dd>
+                    </div>
+                }
+            </dl>
+        </div>
+    </div>
+</div>

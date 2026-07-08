@@ -524,6 +524,7 @@ builder.Services.AddSingleton<SubNavExportResolver>();
 builder.Services.AddSingleton<SubNavDataAccessResolver>();
 builder.Services.AddScoped<IReturnStatusService, ReturnStatusService>();
 builder.Services.AddScoped<IMonthlyUpdateService, MonthlyUpdateService>();
+builder.Services.AddScoped<IWeeklyUpdateService, WeeklyUpdateService>();
 builder.Services.AddScoped<IPerformanceReportingEligibilityService, PerformanceReportingEligibilityService>();
 builder.Services.AddScoped<IGraphService, GraphService>();
 builder.Services.AddScoped<IApiTokenService, ApiTokenService>();
@@ -557,6 +558,7 @@ builder.Services.AddScoped<INotificationRuleService, NotificationRuleService>();
 builder.Services.AddScoped<IAccessibilityTrainingService, AccessibilityTrainingService>();
 builder.Services.AddScoped<Compass.Services.DemandTriage.IDemandTriageService, Compass.Services.DemandTriage.DemandTriageService>();
 builder.Services.AddScoped<Compass.Services.Dashboard.IHomeDashboardViewModelBuilder, Compass.Services.Dashboard.HomeDashboardViewModelBuilder>();
+builder.Services.AddScoped<Compass.Services.Dashboard.IYourTasksViewModelBuilder, Compass.Services.Dashboard.YourTasksViewModelBuilder>();
 builder.Services.Configure<Compass.Configuration.WorkRegisterDiagnosticsOptions>(
     builder.Configuration.GetSection(Compass.Configuration.WorkRegisterDiagnosticsOptions.SectionName));
 builder.Services.AddSingleton<Compass.Services.WorkRegisterPerfFileLog>();
@@ -876,6 +878,9 @@ using (var scope = app.Services.CreateScope())
         }
         logger.LogInformation("Database connection successful");
 
+        // Repair: empty AddWeeklyWorkReporting migration recorded in history but tables never created (--no-build artefact).
+        await RemoveOrphanedEmptyWeeklyWorkReportingMigrationAsync(context, logger);
+
         // Apply any pending migrations
         logger.LogInformation("Applying database migrations...");
         await context.Database.MigrateAsync();
@@ -895,6 +900,9 @@ using (var scope = app.Services.CreateScope())
 
         // Repair: API token self-service tables when AddApiTokenSelfService was recorded but empty (generated with --no-build).
         await EnsureApiTokenSelfServiceTablesAsync(context, logger);
+
+        // Repair: weekly work reporting tables when AddWeeklyWorkReporting was recorded but empty (generated with --no-build).
+        await EnsureWeeklyWorkReportingTablesAsync(context, logger);
 
         // Seed statement templates if they don't exist
         await SeedStatementTemplatesAsync(context);
@@ -1019,6 +1027,142 @@ static async Task EnsureApiTokenSelfServiceTablesAsync(CompassDbContext context,
     {
         logger.LogWarning(ex,
             "Could not ensure API token self-service schema (non-fatal if already exists): {Message}",
+            ex.Message);
+    }
+}
+
+/// <summary>
+/// Removes migration history for the empty <c>20260702100939_AddWeeklyWorkReporting</c> migration when tables were never created.
+/// </summary>
+static async Task RemoveOrphanedEmptyWeeklyWorkReportingMigrationAsync(CompassDbContext context, ILogger logger)
+{
+    try
+    {
+        await context.Database.ExecuteSqlRawAsync("""
+            IF OBJECT_ID(N'dbo.WeeklyWorkReportingConfigs', N'U') IS NULL
+               AND EXISTS (
+                   SELECT 1 FROM [__EFMigrationsHistory]
+                   WHERE [MigrationId] = N'20260702100939_AddWeeklyWorkReporting')
+                DELETE FROM [__EFMigrationsHistory]
+                WHERE [MigrationId] = N'20260702100939_AddWeeklyWorkReporting';
+            """);
+        logger.LogInformation("Removed orphaned empty AddWeeklyWorkReporting migration history (if applicable).");
+    }
+    catch (Microsoft.Data.SqlClient.SqlException ex)
+    {
+        logger.LogWarning(ex,
+            "Could not remove orphaned AddWeeklyWorkReporting migration history: {Message}",
+            ex.Message);
+    }
+}
+
+/// <summary>
+/// Ensures weekly work reporting schema exists when <see cref="Compass.Migrations.AddWeeklyWorkReporting"/>
+/// was applied as an empty migration (e.g. generated with --no-build before models compiled).
+/// </summary>
+static async Task EnsureWeeklyWorkReportingTablesAsync(CompassDbContext context, ILogger logger)
+{
+    try
+    {
+        await context.Database.ExecuteSqlRawAsync("""
+            IF OBJECT_ID(N'dbo.WeeklyWorkReportingConfigs', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [dbo].[WeeklyWorkReportingConfigs] (
+                    [Id] int NOT NULL IDENTITY(1,1),
+                    [PeriodStartDayOfWeek] int NOT NULL,
+                    [PeriodEndDayOfWeek] int NOT NULL,
+                    [DueDayOfWeek] int NOT NULL,
+                    [DueWeekOffset] int NOT NULL,
+                    [IsActive] bit NOT NULL,
+                    [UpdatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_WeeklyWorkReportingConfigs] PRIMARY KEY CLUSTERED ([Id])
+                );
+                SET IDENTITY_INSERT [dbo].[WeeklyWorkReportingConfigs] ON;
+                INSERT INTO [dbo].[WeeklyWorkReportingConfigs]
+                    ([Id], [PeriodStartDayOfWeek], [PeriodEndDayOfWeek], [DueDayOfWeek], [DueWeekOffset], [FirstReportingPeriodStart], [IsActive], [UpdatedAt])
+                VALUES (1, 1, 5, 5, 0, '2026-06-29T00:00:00.0000000Z', 1, '2026-07-02T00:00:00.0000000Z');
+                SET IDENTITY_INSERT [dbo].[WeeklyWorkReportingConfigs] OFF;
+            END
+
+            IF COL_LENGTH(N'dbo.WeeklyWorkReportingConfigs', N'FirstReportingPeriodStart') IS NULL
+            BEGIN
+                ALTER TABLE [dbo].[WeeklyWorkReportingConfigs]
+                    ADD [FirstReportingPeriodStart] datetime2 NOT NULL
+                    CONSTRAINT [DF_WeeklyWorkReportingConfigs_FirstReportingPeriodStart] DEFAULT '2026-06-29T00:00:00.0000000Z';
+            END
+
+            IF OBJECT_ID(N'dbo.WeeklyWorkReportingScopeProjects', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [dbo].[WeeklyWorkReportingScopeProjects] (
+                    [Id] int NOT NULL IDENTITY(1,1),
+                    [ProjectId] int NOT NULL,
+                    [AddedAt] datetime2 NOT NULL,
+                    [AddedByEmail] nvarchar(450) NULL,
+                    CONSTRAINT [PK_WeeklyWorkReportingScopeProjects] PRIMARY KEY CLUSTERED ([Id]),
+                    CONSTRAINT [FK_WeeklyWorkReportingScopeProjects_Projects_ProjectId] FOREIGN KEY ([ProjectId])
+                        REFERENCES [dbo].[Projects]([Id]) ON DELETE CASCADE
+                );
+            END
+
+            IF OBJECT_ID(N'dbo.WeeklyWorkReportingScopeProjects', N'U') IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_WeeklyWorkReportingScopeProjects_ProjectId' AND object_id = OBJECT_ID(N'dbo.WeeklyWorkReportingScopeProjects'))
+                CREATE UNIQUE INDEX [IX_WeeklyWorkReportingScopeProjects_ProjectId] ON [dbo].[WeeklyWorkReportingScopeProjects]([ProjectId]);
+
+            IF OBJECT_ID(N'dbo.ProjectWeeklyWorkUpdates', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [dbo].[ProjectWeeklyWorkUpdates] (
+                    [Id] int NOT NULL IDENTITY(1,1),
+                    [ProjectId] int NOT NULL,
+                    [IsoYear] int NOT NULL,
+                    [IsoWeek] int NOT NULL,
+                    [WeekStartDate] datetime2 NOT NULL,
+                    [WeekEndDate] datetime2 NOT NULL,
+                    [Narrative] nvarchar(4000) NOT NULL,
+                    [CreatedByEntraId] nvarchar(450) NULL,
+                    [CreatedByName] nvarchar(450) NULL,
+                    [CreatedByEmail] nvarchar(450) NULL,
+                    [CreatedByUserId] int NULL,
+                    [UpdatedByUserId] int NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    [UpdatedAt] datetime2 NULL,
+                    [SubmittedAt] datetime2 NULL,
+                    [WeeklyPermFte] decimal(18,2) NULL,
+                    [WeeklyMspFte] decimal(18,2) NULL,
+                    [PeopleNarrative] nvarchar(4000) NULL,
+                    [DraftRagStatusLookupId] int NULL,
+                    [DraftRagJustification] nvarchar(4000) NULL,
+                    [DraftPathToGreen] nvarchar(4000) NULL,
+                    CONSTRAINT [PK_ProjectWeeklyWorkUpdates] PRIMARY KEY CLUSTERED ([Id]),
+                    CONSTRAINT [FK_ProjectWeeklyWorkUpdates_Projects_ProjectId] FOREIGN KEY ([ProjectId])
+                        REFERENCES [dbo].[Projects]([Id]) ON DELETE CASCADE,
+                    CONSTRAINT [FK_ProjectWeeklyWorkUpdates_RagStatusLookups_DraftRagStatusLookupId] FOREIGN KEY ([DraftRagStatusLookupId])
+                        REFERENCES [dbo].[RagStatusLookups]([Id]),
+                    CONSTRAINT [FK_ProjectWeeklyWorkUpdates_Users_CreatedByUserId] FOREIGN KEY ([CreatedByUserId])
+                        REFERENCES [dbo].[Users]([Id]),
+                    CONSTRAINT [FK_ProjectWeeklyWorkUpdates_Users_UpdatedByUserId] FOREIGN KEY ([UpdatedByUserId])
+                        REFERENCES [dbo].[Users]([Id])
+                );
+            END
+
+            IF OBJECT_ID(N'dbo.ProjectWeeklyWorkUpdates', N'U') IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ProjectWeeklyWorkUpdates_ProjectId_IsoYear_IsoWeek' AND object_id = OBJECT_ID(N'dbo.ProjectWeeklyWorkUpdates'))
+                CREATE UNIQUE INDEX [IX_ProjectWeeklyWorkUpdates_ProjectId_IsoYear_IsoWeek] ON [dbo].[ProjectWeeklyWorkUpdates]([ProjectId], [IsoYear], [IsoWeek]);
+            IF OBJECT_ID(N'dbo.ProjectWeeklyWorkUpdates', N'U') IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ProjectWeeklyWorkUpdates_CreatedByUserId' AND object_id = OBJECT_ID(N'dbo.ProjectWeeklyWorkUpdates'))
+                CREATE NONCLUSTERED INDEX [IX_ProjectWeeklyWorkUpdates_CreatedByUserId] ON [dbo].[ProjectWeeklyWorkUpdates]([CreatedByUserId]);
+            IF OBJECT_ID(N'dbo.ProjectWeeklyWorkUpdates', N'U') IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ProjectWeeklyWorkUpdates_DraftRagStatusLookupId' AND object_id = OBJECT_ID(N'dbo.ProjectWeeklyWorkUpdates'))
+                CREATE NONCLUSTERED INDEX [IX_ProjectWeeklyWorkUpdates_DraftRagStatusLookupId] ON [dbo].[ProjectWeeklyWorkUpdates]([DraftRagStatusLookupId]);
+            IF OBJECT_ID(N'dbo.ProjectWeeklyWorkUpdates', N'U') IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ProjectWeeklyWorkUpdates_UpdatedByUserId' AND object_id = OBJECT_ID(N'dbo.ProjectWeeklyWorkUpdates'))
+                CREATE NONCLUSTERED INDEX [IX_ProjectWeeklyWorkUpdates_UpdatedByUserId] ON [dbo].[ProjectWeeklyWorkUpdates]([UpdatedByUserId]);
+            """);
+        logger.LogInformation("Ensured weekly work reporting tables (if missing).");
+    }
+    catch (Microsoft.Data.SqlClient.SqlException ex)
+    {
+        logger.LogWarning(ex,
+            "Could not ensure weekly work reporting schema (non-fatal if already exists): {Message}",
             ex.Message);
     }
 }

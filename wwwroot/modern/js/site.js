@@ -720,7 +720,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Modern work item detail: tab panels + URL hash (tabs are <a href="...#wd-…">; hashchange alone is unreliable in some cases)
 (function () {
-  var WD_ALL_PANES = ['wd-overview', 'wd-updates', 'wd-risks', 'wd-issues', 'wd-milestones', 'wd-contacts', 'wd-service-register', 'wd-strategic-alignment', 'wd-dependencies', 'wd-assumptions', 'wd-history'];
+  var WD_ALL_PANES = ['wd-overview', 'wd-weekly-updates', 'wd-updates', 'wd-risks', 'wd-issues', 'wd-milestones', 'wd-contacts', 'wd-service-register', 'wd-strategic-alignment', 'wd-dependencies', 'wd-assumptions', 'wd-history'];
 
   function isWorkDetailPage() {
     return !!document.querySelector('.wd-work-detail-tabs');

@@ -3,9 +3,12 @@
   var m = Model;
 }
 <div class="dfe-f-card-grid govuk-!-margin-bottom-4">
-  <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey">
-    <p class="govuk-body-s dfe-f-stat-card__label">Active work items</p>
-    <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@m.TotalActiveProjects</p>
+  <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey dfe-f-stat-card--linked">
+    <button type="button" class="dfe-f-stat-card__link mr-stat-card-jump" data-mr-jump-section="active-work-items" aria-label="View @m.TotalActiveProjects active work items in report">
+      <span class="govuk-visually-hidden">Active work items: </span>
+      <p class="govuk-body-s dfe-f-stat-card__label">Active work items</p>
+      <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@m.TotalActiveProjects</p>
+    </button>
   </div>
   <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey">
     <p class="govuk-body-s dfe-f-stat-card__label">New this month</p>

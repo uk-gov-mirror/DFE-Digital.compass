@@ -726,7 +726,7 @@ public sealed class CommissionReportingAnalyticsService
         foreach (var metric in metricsForPeriod.OrderBy(m => m.Title))
         {
             var applicable = 0;
-            var completed = 0;
+            var completedProducts = new List<OpsPerfMetricProductRow>();
             foreach (var p in eligibleProducts)
             {
                 var docId = p.DocumentId ?? "";
@@ -737,8 +737,19 @@ public sealed class CommissionReportingAnalyticsService
                 if (applicableForProduct.All(m => m.Id != metric.Id))
                     continue;
                 applicable++;
-                if (existing.Any(mv => mv.PerformanceMetricId == metric.Id && mv.IsComplete))
-                    completed++;
+                var mv = existing.FirstOrDefault(x => x.PerformanceMetricId == metric.Id && x.IsComplete);
+                if (mv == null)
+                    continue;
+
+                completedProducts.Add(new OpsPerfMetricProductRow
+                {
+                    ProductTitle = p.Title ?? "Untitled",
+                    ProductDocumentId = docId,
+                    BusinessArea = CommissionReportingProductScope.GetBusinessArea(p) ?? "Not assigned",
+                    DisplayValue = FormatMetricValueDisplay(mv),
+                    NotCapturedReason = mv.IsNotCaptured ? mv.NotCapturedReason : null,
+                    ReasonForDifference = mv.ReasonForDifference
+                });
             }
 
             if (applicable > 0)
@@ -748,12 +759,23 @@ public sealed class CommissionReportingAnalyticsService
                     MetricId = metric.Id,
                     Name = metric.Title,
                     ApplicableProducts = applicable,
-                    CompletedCount = completed
+                    CompletedCount = completedProducts.Count,
+                    CompletedProducts = completedProducts
+                        .OrderBy(x => x.ProductTitle, StringComparer.OrdinalIgnoreCase)
+                        .ToList()
                 });
             }
         }
 
         return rows;
+    }
+
+    private static string FormatMetricValueDisplay(CommissionMetricValue mv)
+    {
+        if (mv.IsNotCaptured)
+            return "Not captured";
+
+        return string.IsNullOrWhiteSpace(mv.Value) ? "–" : mv.Value.Trim();
     }
 
     private static List<ProductDto> ApplyPerformanceCatalogueFilters(

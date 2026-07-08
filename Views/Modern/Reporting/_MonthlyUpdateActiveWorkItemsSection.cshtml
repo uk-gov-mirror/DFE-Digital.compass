@@ -1,0 +1,71 @@
+@model Compass.ViewModels.ModernMonthlyReportDashboardViewModel
+@using Compass.Models.Modern.Work
+@using Compass.ViewModels.Modern
+@{
+  var m = Model;
+  var items = m.ScopeProjectItems.OrderBy(x => x.Title).ToList();
+  var count = m.TotalActiveProjects > 0 ? m.TotalActiveProjects : items.Count;
+  var mwDetailPrefix = Url.Content("~/modern/work/detail/") ?? "/modern/work/detail/";
+  var exportIds = items.Select(x => x.Id).Where(id => id > 0).Distinct().ToArray();
+  var exportUrl = exportIds.Length > 0
+    ? Url.Action("ExportWorkScope", "ModernReporting", new { ids = exportIds, label = "Active work items" }) ?? ""
+    : "";
+  var exportBar = new ReportingTableExportBarModel
+  {
+    Caption = "Active work items in report scope",
+    Count = count,
+    ExportUrl = exportUrl,
+    ShowExport = exportIds.Length > 0
+  };
+}
+
+<div class="mr-report-section-panel dfe-f-toggle govuk-!-margin-bottom-3" data-module="dfe-f-toggle" id="mr-p-active-work-items" data-mr-section-id="active-work-items" data-mr-section-title="Active work items">
+  <div class="dfe-f-toggle__title-wrapper">
+    <h2 class="dfe-f-toggle__heading">
+      <button type="button" class="dfe-f-toggle__button" id="mr-toggle-active-work-items-button" aria-expanded="false" aria-controls="mr-s-active-work-items">
+        <span class="dfe-f-toggle__icon" aria-hidden="true"></span>
+        <span class="dfe-f-toggle__title">Active work items</span>
+        <span class="mr-toggle-panel__meta"><span class="@WorkBadgeCss.ToggleCountBadgeClass(count)">@count</span></span>
+      </button>
+    </h2>
+  </div>
+  <div id="mr-s-active-work-items" class="dfe-f-toggle__content">
+    <div class="dfe-f-toggle__body govuk-body">
+      @if (items.Count == 0)
+      {
+        <p class="govuk-body">No active work items in scope for this report.</p>
+      }
+      else
+      {
+        @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingTableExportBar.cshtml", exportBar)
+        <div class="dfe-f-table-wrapper" data-module="dfe-f-table">
+          <table class="govuk-table govuk-table--small-text-until-tablet dfe-f-table--condensed">
+            <thead class="govuk-table__head">
+              <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Work item</button></th>
+                <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">RAG</button></th>
+                <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Priority</button></th>
+                <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Business area</button></th>
+                <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Status</button></th>
+              </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+              @foreach (var w in items)
+              {
+                <tr class="govuk-table__row">
+                  <td class="govuk-table__cell">
+                    <a class="govuk-link govuk-link--no-visited-state govuk-!-font-weight-bold" href="@(mwDetailPrefix)@w.Id">@w.Title</a>
+                  </td>
+                  <td class="govuk-table__cell"><span class="@WorkBadgeCss.RagCompactBadgeClass(string.IsNullOrWhiteSpace(w.Rag) ? "Not set" : w.Rag)">@(string.IsNullOrWhiteSpace(w.Rag) ? "Not set" : w.Rag)</span></td>
+                  <td class="govuk-table__cell"><span class="@(WorkBadgeCss.PriorityDfeFrontendBadgeClass(string.IsNullOrWhiteSpace(w.Priority) ? "Not set" : w.Priority) + " dfe-f-badge--small")">@(string.IsNullOrWhiteSpace(w.Priority) ? "Not set" : w.Priority)</span></td>
+                  <td class="govuk-table__cell">@(w.BusinessArea ?? "—")</td>
+                  <td class="govuk-table__cell">@(w.Status ?? "—")</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</div>

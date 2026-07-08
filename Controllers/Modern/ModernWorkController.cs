@@ -84,6 +84,7 @@ public partial class ModernWorkController : Controller
     private readonly IWorkScopedExcelExportService _workScopedExcelExport;
     private readonly INotificationRuleService _notificationRuleService;
     private readonly IMonthlyUpdateService _monthlyUpdateService;
+    private readonly IWeeklyUpdateService _weeklyUpdateService;
     private readonly ILogger<ModernWorkController> _logger;
     private readonly IRaidRiskEditorFormService _raidRiskEditorForm;
     private readonly IRaidIssueEditorFormService _raidIssueEditorForm;
@@ -98,6 +99,7 @@ public partial class ModernWorkController : Controller
         IWorkScopedExcelExportService workScopedExcelExport,
         INotificationRuleService notificationRuleService,
         IMonthlyUpdateService monthlyUpdateService,
+        IWeeklyUpdateService weeklyUpdateService,
         ILogger<ModernWorkController> logger,
         IRaidRiskEditorFormService raidRiskEditorForm,
         IRaidIssueEditorFormService raidIssueEditorForm,
@@ -111,6 +113,7 @@ public partial class ModernWorkController : Controller
         _workScopedExcelExport = workScopedExcelExport;
         _notificationRuleService = notificationRuleService;
         _monthlyUpdateService = monthlyUpdateService;
+        _weeklyUpdateService = weeklyUpdateService;
         _logger = logger;
         _raidRiskEditorForm = raidRiskEditorForm;
         _raidIssueEditorForm = raidIssueEditorForm;
@@ -855,6 +858,8 @@ public partial class ModernWorkController : Controller
         ViewBag.PeriodDueDate = periodDue;
         var canUnsubmit = mu.SubmittedAt.HasValue && DateTime.UtcNow.Date <= periodDue.Date;
         ViewBag.CanUnsubmit = canUnsubmit;
+        ViewBag.ReportMilestoneRows = await MilestoneReportHelper.LoadSubmittedMilestoneRowsAsync(
+            _context, mu.Id, null, cancellationToken);
 
         ViewBag.WorkChromeSubPage = false;
         ViewBag.WorkChromeMinimalHeader = false;
@@ -931,6 +936,9 @@ public partial class ModernWorkController : Controller
         int id, int year, int month,
         string? narrative, string? peopleNarrative, decimal? permFte, decimal? mspFte,
         int? ragStatusId, string? ragJustification, string? pathToGreen,
+        [FromForm] Dictionary<int, string>? milestoneStatus,
+        [FromForm] Dictionary<int, int?>? milestoneRagStatusId,
+        [FromForm] Dictionary<int, string>? milestoneUpdateNote,
         string? command,
         CancellationToken cancellationToken = default)
     {
@@ -978,6 +986,17 @@ public partial class ModernWorkController : Controller
                 .FirstOrDefaultAsync(r => r.Id == ridPost && r.IsActive, cancellationToken);
         }
 
+        var existingDraft = await _context.ProjectMonthlyUpdates.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.ProjectId == id && m.Year == year && m.Month == month, cancellationToken);
+        var milestoneRows = await ResolveMonthlyReportMilestoneRowsAsync(
+            id,
+            existingDraft?.Id,
+            milestoneStatus,
+            milestoneRagStatusId,
+            milestoneUpdateNote,
+            cancellationToken);
+        var activeRagById = await MilestoneReportHelper.LoadActiveRagLookupsAsync(_context, cancellationToken);
+
         ValidateMonthlyReportForm(
             ModelState,
             isSubmit,
@@ -990,6 +1009,8 @@ public partial class ModernWorkController : Controller
             ragJustification,
             pathToGreen);
 
+        MilestoneReportHelper.ValidatePostedMilestones(ModelState, isSubmit, milestoneRows, activeRagById);
+
         if (!ModelState.IsValid)
         {
             var posted = new MonthlyReportPostedForm(
@@ -999,10 +1020,14 @@ public partial class ModernWorkController : Controller
                 mspFte,
                 ragStatusId,
                 ragJustification,
-                pathToGreen);
+                pathToGreen,
+                milestoneStatus,
+                milestoneRagStatusId,
+                milestoneUpdateNote);
             var vmInvalid = await LoadMonthlyReportViewModelAsync(id, year, month, posted, cancellationToken);
             if (vmInvalid == null)
                 return NotFound();
+            vmInvalid.Milestones = milestoneRows;
             return await MonthlyReportViewResultAsync(vmInvalid, cancellationToken);
         }
 
@@ -1073,6 +1098,19 @@ public partial class ModernWorkController : Controller
             update.SubmittedAt = DateTime.UtcNow;
 
         project.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        await MilestoneReportHelper.PersistMilestoneEntriesForMonthlyUpdateAsync(
+            _context,
+            id,
+            update.Id,
+            milestoneRows,
+            activeRagById,
+            userEmail,
+            currentUser?.Name,
+            cancellationToken);
+
         try
         {
             await _context.SaveChangesAsync(cancellationToken);
@@ -1088,10 +1126,14 @@ public partial class ModernWorkController : Controller
                 mspFte,
                 ragStatusId,
                 ragJustification,
-                pathToGreen);
+                pathToGreen,
+                milestoneStatus,
+                milestoneRagStatusId,
+                milestoneUpdateNote);
             var vmOnError = await LoadMonthlyReportViewModelAsync(id, year, month, postedOnError, cancellationToken);
             if (vmOnError == null)
                 return NotFound();
+            vmOnError.Milestones = milestoneRows;
             return await MonthlyReportViewResultAsync(vmOnError, cancellationToken);
         }
 
@@ -1141,7 +1183,10 @@ public partial class ModernWorkController : Controller
         decimal? MspFte,
         int? RagStatusId,
         string? RagJustification,
-        string? PathToGreen);
+        string? PathToGreen,
+        Dictionary<int, string>? MilestoneStatus = null,
+        Dictionary<int, int?>? MilestoneRagStatusId = null,
+        Dictionary<int, string>? MilestoneUpdateNote = null);
 
     private const int MonthlyReportMaxTextLength = 4000;
     private const decimal MonthlyReportMaxHeadcount = 10000m;
@@ -1364,8 +1409,44 @@ public partial class ModernWorkController : Controller
         vm.PreviousMonthSubmission = await TryLoadPreviousMonthSubmissionAsync(
             id, year, month, ragHistDesc, cancellationToken);
 
+        vm.Milestones = await MilestoneReportHelper.LoadReportMilestoneRowsAsync(
+            _context, id, update?.Id, null, cancellationToken);
+
+        if (posted != null)
+        {
+            var activeRagById = await MilestoneReportHelper.LoadActiveRagLookupsAsync(_context, cancellationToken);
+            vm.Milestones = MilestoneReportHelper.ApplyPostedMilestoneRows(
+                vm.Milestones,
+                posted.MilestoneStatus,
+                posted.MilestoneRagStatusId,
+                posted.MilestoneUpdateNote,
+                activeRagById);
+        }
+
         return vm;
     }
+
+    private async Task<List<ReportMilestoneRowViewModel>> ResolveMonthlyReportMilestoneRowsAsync(
+        int projectId,
+        int? monthlyUpdateId,
+        Dictionary<int, string>? postedStatus,
+        Dictionary<int, int?>? postedRagStatusId,
+        Dictionary<int, string>? postedUpdateNote,
+        CancellationToken cancellationToken)
+    {
+        var baseline = await MilestoneReportHelper.LoadReportMilestoneRowsAsync(
+            _context, projectId, monthlyUpdateId, null, cancellationToken);
+        var activeRagById = await MilestoneReportHelper.LoadActiveRagLookupsAsync(_context, cancellationToken);
+        return MilestoneReportHelper.ApplyPostedMilestoneRows(
+            baseline, postedStatus, postedRagStatusId, postedUpdateNote, activeRagById);
+    }
+
+    private async Task<List<RagStatus>> LoadMilestoneRagStatusesForViewAsync(CancellationToken cancellationToken) =>
+        await _context.RagStatusLookups.AsNoTracking()
+            .Where(r => r.IsActive)
+            .OrderBy(r => r.SortOrder)
+            .Select(r => new RagStatus { Id = r.Id, Name = r.Name, Description = r.Description })
+            .ToListAsync(cancellationToken);
 
     private async Task<MonthlyReportPreviousSubmission?> TryLoadPreviousMonthSubmissionAsync(
         int projectId,
@@ -2181,6 +2262,7 @@ public partial class ModernWorkController : Controller
 
         ViewBag.WorkItem = work;
         ViewBag.WorkChromeSubPage = true;
+        ViewBag.MilestoneRagStatuses = await LoadMilestoneRagStatusesForViewAsync(cancellationToken);
 
         var milestone = new Milestone
         {
@@ -2190,6 +2272,68 @@ public partial class ModernWorkController : Controller
         };
 
         return View("~/Views/Modern/Work/AddMilestone.cshtml", milestone);
+    }
+
+    [HttpPost("{id:int}/milestone/add")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddMilestonePost(
+        int id,
+        [FromForm] string name,
+        [FromForm] string? description,
+        [FromForm] DateTime dueDate,
+        [FromForm] string status,
+        [FromForm] int? ragStatusLookupId,
+        CancellationToken cancellationToken = default)
+    {
+        name = name?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(name))
+            ModelState.AddModelError("name", "Enter a milestone name.");
+
+        status = status?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(status) || !ValidMilestoneStatuses.Contains(status))
+            ModelState.AddModelError("status", "Select a valid status.");
+
+        RagStatusLookup? resolvedRag = null;
+        if (ragStatusLookupId is > 0)
+        {
+            resolvedRag = await _context.RagStatusLookups.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Id == ragStatusLookupId.Value && r.IsActive, cancellationToken);
+            if (resolvedRag == null)
+                ModelState.AddModelError("ragStatusLookupId", "Select a valid RAG status.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            if (!await TryPopulateEditMilestoneViewBagsAsync(id, cancellationToken))
+                return NotFound();
+            ViewBag.MilestoneRagStatuses = await LoadMilestoneRagStatusesForViewAsync(cancellationToken);
+            return View("~/Views/Modern/Work/AddMilestone.cshtml", new Milestone
+            {
+                ProjectId = id,
+                Name = name,
+                Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+                DueDate = dueDate.Date,
+                Status = status,
+                RagStatusLookupId = ragStatusLookupId
+            });
+        }
+
+        var milestone = new Milestone
+        {
+            ProjectId = id,
+            Name = name,
+            Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+            DueDate = dueDate.Date,
+            Status = status,
+            RagStatusLookupId = resolvedRag?.Id,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        _context.Milestones.Add(milestone);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        TempData["SuccessMessage"] = "Milestone added successfully.";
+        return RedirectToAction(nameof(Detail), new { id, tab = "milestones" });
     }
 
     /// <summary>Edit milestone (modern UI). Canonical path <c>/modern/work/{id}/milestone/{milestoneId}/edit</c>.</summary>
@@ -2210,6 +2354,7 @@ public partial class ModernWorkController : Controller
 
         var milestone = await _context.Milestones
             .AsNoTracking()
+            .Include(m => m.RagStatusLookup)
             .FirstOrDefaultAsync(m => m.Id == milestoneId && m.ProjectId == id && !m.IsDeleted, cancellationToken);
         if (milestone == null)
             return NotFound();
@@ -2221,6 +2366,7 @@ public partial class ModernWorkController : Controller
 
         ViewBag.WorkItem = work;
         ViewBag.WorkChromeSubPage = true;
+        ViewBag.MilestoneRagStatuses = await LoadMilestoneRagStatusesForViewAsync(cancellationToken);
         await LoadMilestoneUpdatesForViewAsync(milestoneId, cancellationToken);
 
         return View("~/Views/Modern/Work/EditMilestone.cshtml", milestone);
@@ -2301,9 +2447,11 @@ public partial class ModernWorkController : Controller
         [FromForm] string? Description,
         [FromForm] DateTime dueDate,
         [FromForm] string status,
+        [FromForm] int? ragStatusLookupId,
         CancellationToken cancellationToken = default)
     {
         var milestone = await _context.Milestones
+            .Include(m => m.RagStatusLookup)
             .FirstOrDefaultAsync(m => m.Id == milestoneId && m.ProjectId == id && !m.IsDeleted, cancellationToken);
         if (milestone == null)
             return NotFound();
@@ -2316,23 +2464,52 @@ public partial class ModernWorkController : Controller
         if (string.IsNullOrWhiteSpace(status) || !ValidMilestoneStatuses.Contains(status))
             ModelState.AddModelError("status", "Select a valid status.");
 
+        RagStatusLookup? resolvedRag = null;
+        if (ragStatusLookupId is > 0)
+        {
+            resolvedRag = await _context.RagStatusLookups.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Id == ragStatusLookupId.Value && r.IsActive, cancellationToken);
+            if (resolvedRag == null)
+                ModelState.AddModelError("ragStatusLookupId", "Select a valid RAG status.");
+        }
+
         if (!ModelState.IsValid)
         {
             milestone.Name = name;
             milestone.Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim();
             milestone.DueDate = dueDate.Date;
             milestone.Status = status;
+            milestone.RagStatusLookupId = ragStatusLookupId;
             if (!await TryPopulateEditMilestoneViewBagsAsync(id, cancellationToken))
                 return NotFound();
+            ViewBag.MilestoneRagStatuses = await LoadMilestoneRagStatusesForViewAsync(cancellationToken);
             await LoadMilestoneUpdatesForViewAsync(milestoneId, cancellationToken);
             return View("~/Views/Modern/Work/EditMilestone.cshtml", milestone);
         }
 
+        var previousRagId = milestone.RagStatusLookupId;
         milestone.Name = name;
         milestone.Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim();
         milestone.DueDate = dueDate.Date;
         milestone.Status = status;
+        milestone.RagStatusLookupId = resolvedRag?.Id;
         milestone.UpdatedAt = DateTime.UtcNow;
+
+        if (previousRagId != milestone.RagStatusLookupId)
+        {
+            var userEmail = User.Identity?.Name ?? "system@example.com";
+            var userName = User.Claims.FirstOrDefault(c => c.Type == "name")?.Value;
+            _context.MilestoneUpdates.Add(new MilestoneUpdate
+            {
+                MilestoneId = milestoneId,
+                UpdateDetails = "RAG updated from milestone details.",
+                PreviousRagStatusLookupId = previousRagId,
+                NewRagStatusLookupId = milestone.RagStatusLookupId,
+                UpdatedByEmail = userEmail,
+                UpdatedByName = userName,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
 
         await _context.SaveChangesAsync(cancellationToken);
         TempData["SuccessMessage"] = "Milestone updated successfully.";
@@ -2395,6 +2572,7 @@ public partial class ModernWorkController : Controller
 
         ViewBag.WorkItem = work;
         ViewBag.WorkChromeSubPage = true;
+        ViewBag.MilestoneRagStatuses = await LoadMilestoneRagStatusesForViewAsync(cancellationToken);
         return true;
     }
 

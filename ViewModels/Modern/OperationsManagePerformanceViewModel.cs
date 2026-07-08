@@ -93,8 +93,22 @@ public class OpsPerfMetricRow
     public int ApplicableProducts { get; init; }
     public int CompletedCount { get; init; }
 
+    /// <summary>Products that have completed this metric (for drill-down on reporting pages).</summary>
+    public IReadOnlyList<OpsPerfMetricProductRow> CompletedProducts { get; init; } = Array.Empty<OpsPerfMetricProductRow>();
+
     public decimal CompletionPercent =>
         ApplicableProducts <= 0
             ? 0
             : Math.Round(100m * CompletedCount / ApplicableProducts, 1);
+}
+
+/// <summary>Single product's reported value for a performance metric drill-down.</summary>
+public class OpsPerfMetricProductRow
+{
+    public string ProductTitle { get; init; } = "";
+    public string ProductDocumentId { get; init; } = "";
+    public string BusinessArea { get; init; } = "";
+    public string DisplayValue { get; init; } = "–";
+    public string? NotCapturedReason { get; init; }
+    public string? ReasonForDifference { get; init; }
 }

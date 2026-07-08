@@ -1,0 +1,301 @@
+@model Compass.Models.Modern.Work.WeeklyReportViewModel
+@using Compass.Models.Modern.Work
+@{
+    ViewData["Title"] = $"Weekly update submission — {Model.PeriodLabel}";
+    var isSubmitted = Model.IsSubmitted;
+    var lockedOutsideSubmissionWindow = !Model.CanEditWeeklySubmission && !isSubmitted;
+    var isReadOnly = isSubmitted || lockedOutsideSubmissionWindow;
+    var hasNonGreenRag = false;
+    if (Model.RagStatusId.HasValue)
+    {
+        var selectedRag = Model.RagStatuses.FirstOrDefault(r => r.Id == Model.RagStatusId.Value);
+        hasNonGreenRag = selectedRag != null && !string.Equals(selectedRag.Name, "Green", StringComparison.OrdinalIgnoreCase);
+    }
+    var work = ViewBag.WorkItem as WorkItem;
+    var ms = ViewData.ModelState;
+    string? Err(string key) =>
+        ms.TryGetValue(key, out var st) && st!.Errors.Count > 0 ? st.Errors[0].ErrorMessage : null;
+}
+
+@section Breadcrumbs {
+ <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Index", "ModernDashboard")">Home</a></li>
+ <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Dashboard", "ModernWork")">Work</a></li>
+ <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Detail", "ModernWork", new { id = Model.WorkItemId })">@(Model.WorkItemReference ?? Model.WorkItemTitle)</a></li>
+ <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Detail", "ModernWork", new { id = Model.WorkItemId })#wd-weekly-updates">@(Model.WorkItemReference ?? Model.WorkItemTitle)</a></li>
+ <li class="govuk-breadcrumbs__list-item" aria-current="page">Weekly report</li>
+}
+
+<div id="sc-work-weekly-report" class="modern-work-page">
+@if (work != null)
+{
+  @await Html.PartialAsync("_WorkItemChrome", work)
+}
+
+<div class="govuk-grid-row modern-work-detail-layout govuk-!-margin-top-4">
+  <div class="govuk-grid-column-one-quarter-from-desktop modern-work-detail-layout__nav">
+    <div class="dfe-f-u-sticky govuk-!-margin-bottom-4 modern-work-detail-layout__nav-inner" style="--dfe-f-sticky-top: 1rem;">
+      @if (work != null)
+      {
+        @await Html.PartialAsync("_WorkItemSideNav", work)
+      }
+    </div>
+  </div>
+  <div class="govuk-grid-column-three-quarters-from-desktop modern-work-detail-main">
+
+<h2 class="govuk-heading-l govuk-!-margin-top-0">Weekly update submission</h2>
+
+@if (TempData["WeeklyReportMessage"] is string weeklySuccess && !string.IsNullOrWhiteSpace(weeklySuccess))
+{
+ <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="weekly-report-success-banner-title" data-module="govuk-notification-banner">
+ <div class="govuk-notification-banner__header">
+ <h2 class="govuk-notification-banner__title" id="weekly-report-success-banner-title">Success</h2>
+        </div>
+ <div class="govuk-notification-banner__content"><p class="govuk-notification-banner__heading">@weeklySuccess</p></div>
+    </div>
+}
+@if (TempData["WeeklyReportError"] is string weeklyError && !string.IsNullOrWhiteSpace(weeklyError))
+{
+ <div class="govuk-error-summary" data-module="govuk-error-summary">
+        <div role="alert">
+ <h2 class="govuk-error-summary__title">There is a problem</h2>
+ <div class="govuk-error-summary__body"><p>@weeklyError</p></div>
+        </div>
+    </div>
+}
+
+ <div class="dfe-c-card dfe-c-card--plain">
+@if (lockedOutsideSubmissionWindow)
+{
+ <div class="govuk-warning-text govuk-!-margin-bottom-6">
+ <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+ <strong class="govuk-warning-text__text"><span class="govuk-warning-text__assistive govuk-visually-hidden">Warning:</span>
+            Submissions for @Model.PeriodLabel are only available between the submission open and close dates set in Admin → Work reporting.
+        </strong>
+    </div>
+}
+@if (isSubmitted)
+{
+ <div class="govuk-inset-text dfe-c-mb-4">
+            <strong>Submitted</strong> on @Model.SubmittedAt?.ToString("d MMM yyyy 'at' HH:mm") by @(Model.SubmittedByName ?? "—")
+            @if (Model.CanUnsubmit)
+            {
+                <form method="post" action="@Url.Action("WeeklyReportUnsubmit", "ModernWork", new { id = Model.WorkItemId, year = Model.IsoYear, week = Model.IsoWeek })" style="display:inline; margin-left:1rem;">
+                    @Html.AntiForgeryToken()
+ <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Unsubmit</button>
+                </form>
+            }
+        </div>
+}
+
+        <form method="post" action="@Url.Action("WeeklyReportPost", "ModernWork", new { id = Model.WorkItemId, year = Model.IsoYear, week = Model.IsoWeek })" novalidate>
+            @Html.AntiForgeryToken()
+
+ @if (!ViewData.ModelState.IsValid)
+ {
+ <div class="govuk-error-summary govuk-!-margin-bottom-6" data-module="govuk-error-summary" role="alert" aria-labelledby="monthly-report-error-summary-title">
+ <h2 class="govuk-error-summary__title" id="monthly-report-error-summary-title">There is a problem</h2>
+ <div class="govuk-error-summary__body">
+ <ul class="govuk-list govuk-error-summary__list">
+ @foreach (var kv in ViewData.ModelState)
+ {
+   if (kv.Value?.Errors == null || kv.Value.Errors.Count == 0) { continue; }
+   var msg = kv.Value.Errors[0].ErrorMessage;
+   if (string.IsNullOrEmpty(kv.Key))
+   {
+ <li>@msg</li>
+   }
+   else
+   {
+ <li><a href="#@kv.Key">@msg</a></li>
+   }
+ }
+ </ul>
+ </div>
+ </div>
+ }
+
+ <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-6">
+ <div class="govuk-summary-list__row">
+ <dt class="govuk-summary-list__key">Reporting period</dt>
+ <dd class="govuk-summary-list__value">@Model.PeriodLabel</dd>
+ </div>
+ @if (Model.SubmissionOpens != default)
+ {
+ <div class="govuk-summary-list__row">
+ <dt class="govuk-summary-list__key">Opens</dt>
+ <dd class="govuk-summary-list__value"><span class="dfe-f-u-tabular-numbers">@Model.SubmissionOpens.ToString("ddd d MMM yyyy")</span></dd>
+ </div>
+ }
+ <div class="govuk-summary-list__row">
+ <dt class="govuk-summary-list__key">Return due by</dt>
+ <dd class="govuk-summary-list__value"><span class="dfe-f-u-tabular-numbers">@Model.DueDate.ToString("ddd d MMM yyyy")</span></dd>
+ </div>
+ </dl>
+
+ @if (Model.PreviousWeekSubmission != null)
+ {
+   @await Html.PartialAsync("_WeeklyReportLastWeek", Model.PreviousWeekSubmission)
+ }
+
+ <h3 class="govuk-heading-m govuk-!-margin-top-6" id="monthly-report-people-heading">People</h3>
+
+ <div class="govuk-form-group @(Err("permFte") != null ? "govuk-form-group--error" : "")">
+ <label class="govuk-label" for="permFte">Permanent FTE</label>
+ <div id="permFte-hint" class="govuk-hint">Full-time equivalent headcount for permanent staff.</div>
+ @if (Err("permFte") != null)
+ {
+ <p id="permFte-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@Err("permFte")</p>
+ }
+ <input class="govuk-input govuk-input--width-5 @(Err("permFte") != null ? "govuk-input--error" : "")" id="permFte" name="permFte" type="number" step="0.01" min="0" max="10000" value="@(Model.PermFte?.ToString("0.##") ?? "")" aria-invalid="@(Err("permFte") != null ? "true" : "false")" aria-describedby="@(Err("permFte") != null ? "permFte-error permFte-hint" : "permFte-hint")" @(isReadOnly ? "disabled" : "") />
+            </div>
+
+ <div class="govuk-form-group @(Err("mspFte") != null ? "govuk-form-group--error" : "")">
+ <label class="govuk-label" for="mspFte">MSC number</label>
+ <div id="mspFte-hint" class="govuk-hint">Full-time equivalent for managed service / contractor staff.</div>
+ @if (Err("mspFte") != null)
+ {
+ <p id="mspFte-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@Err("mspFte")</p>
+ }
+ <input class="govuk-input govuk-input--width-5 @(Err("mspFte") != null ? "govuk-input--error" : "")" id="mspFte" name="mspFte" type="number" step="0.01" min="0" max="10000" value="@(Model.MspFte?.ToString("0.##") ?? "")" aria-invalid="@(Err("mspFte") != null ? "true" : "false")" aria-describedby="@(Err("mspFte") != null ? "mspFte-error mspFte-hint" : "mspFte-hint")" @(isReadOnly ? "disabled" : "") />
+            </div>
+
+ <div class="govuk-form-group @(Err("peopleNarrative") != null ? "govuk-form-group--error" : "")">
+ <label class="govuk-label" for="peopleNarrative">Narrative on people this week</label>
+ <div id="peopleNarrative-hint" class="govuk-hint">Include details of significant changes, moves, onboarding, offboarding.</div>
+ @if (Err("peopleNarrative") != null)
+ {
+ <p id="peopleNarrative-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@Err("peopleNarrative")</p>
+ }
+ <textarea class="govuk-textarea @(Err("peopleNarrative") != null ? "govuk-textarea--error" : "")" id="peopleNarrative" name="peopleNarrative" rows="4" maxlength="4000" aria-invalid="@(Err("peopleNarrative") != null ? "true" : "false")" aria-describedby="@(Err("peopleNarrative") != null ? "peopleNarrative-error peopleNarrative-hint peopleNarrative-count" : "peopleNarrative-hint peopleNarrative-count")" @(isReadOnly ? "disabled" : "")>@Model.PeopleNarrative</textarea>
+ <div id="peopleNarrative-count" class="govuk-hint govuk-character-count__message" aria-live="polite">
+ <span class="char-current">@(Model.PeopleNarrative?.Length ?? 0)</span> of 4,000 characters
+                </div>
+            </div>
+
+ <h3 class="govuk-heading-m govuk-!-margin-top-6" id="monthly-report-delivery-heading">Delivery confidence and update</h3>
+
+ <div class="govuk-form-group @(Err("rag-status-group") != null ? "govuk-form-group--error" : "")" id="rag-status-group">
+ <fieldset class="govuk-fieldset" aria-describedby="@(Err("rag-status-group") != null ? "rag-hint rag-status-group-error" : "rag-hint")">
+ <legend class="govuk-fieldset__legend">RAG</legend>
+ <div class="govuk-hint" id="rag-hint">Select the overall delivery confidence rating for this period.</div>
+ @if (Err("rag-status-group") != null)
+ {
+ <p id="rag-status-group-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@Err("rag-status-group")</p>
+ }
+ <div class="govuk-radios @(Err("rag-status-group") != null ? "govuk-radios--error" : "")" data-module="govuk-radios" id="rag-radios">
+                        @foreach (var rag in Model.RagStatuses)
+                        {
+                            var isChecked = Model.RagStatusId == rag.Id;
+ <div class="govuk-radios__item">
+ <input class="govuk-radios__input" id="rag-@rag.Id" name="ragStatusId" type="radio" value="@rag.Id" @(isChecked ? "checked" : "") @(isReadOnly ? "disabled" : "") data-rag-name="@rag.Name" />
+ <label class="govuk-label govuk-radios__label" for="rag-@rag.Id">@rag.Name</label>
+                                @if (!string.IsNullOrEmpty(rag.Description))
+                                {
+ <div id="rag-@(rag.Id)-hint" class="govuk-hint govuk-radios__hint">@rag.Description</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </fieldset>
+            </div>
+
+ <div class="govuk-form-group @(Err("ragJustification") != null ? "govuk-form-group--error" : "")">
+ <label class="govuk-label" for="ragJustification">Justification</label>
+ <div id="ragJustification-hint" class="govuk-hint">Explain why this RAG rating has been given.</div>
+ @if (Err("ragJustification") != null)
+ {
+ <p id="ragJustification-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@Err("ragJustification")</p>
+ }
+ <textarea class="govuk-textarea @(Err("ragJustification") != null ? "govuk-textarea--error" : "")" id="ragJustification" name="ragJustification" rows="10" maxlength="4000" aria-invalid="@(Err("ragJustification") != null ? "true" : "false")" aria-describedby="@(Err("ragJustification") != null ? "ragJustification-error ragJustification-hint ragJustification-count" : "ragJustification-hint ragJustification-count")" @(isReadOnly ? "disabled" : "")>@Model.RagJustification</textarea>
+ <div id="ragJustification-count" class="govuk-hint govuk-character-count__message" aria-live="polite">
+ <span class="char-current">@(Model.RagJustification?.Length ?? 0)</span> of 4,000 characters
+                </div>
+            </div>
+
+ <div class="govuk-form-group @(Err("pathToGreen") != null ? "govuk-form-group--error" : "")" id="pathToGreen-group" style="@(hasNonGreenRag ? "" : "display:none")">
+ <label class="govuk-label" for="pathToGreen">Path to green</label>
+ <div id="pathToGreen-hint" class="govuk-hint">What actions are needed to return this work item to a green RAG status?</div>
+ @if (Err("pathToGreen") != null)
+ {
+ <p id="pathToGreen-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@Err("pathToGreen")</p>
+ }
+ <textarea class="govuk-textarea @(Err("pathToGreen") != null ? "govuk-textarea--error" : "")" id="pathToGreen" name="pathToGreen" rows="10" maxlength="4000" aria-invalid="@(Err("pathToGreen") != null ? "true" : "false")" aria-describedby="@(Err("pathToGreen") != null ? "pathToGreen-error pathToGreen-hint pathToGreen-count" : "pathToGreen-hint pathToGreen-count")" @(isReadOnly ? "disabled" : "")>@Model.PathToGreen</textarea>
+ <div id="pathToGreen-count" class="govuk-hint govuk-character-count__message" aria-live="polite">
+ <span class="char-current">@(Model.PathToGreen?.Length ?? 0)</span> of 4,000 characters
+                </div>
+            </div>
+
+ <div class="govuk-form-group @(Err("narrative") != null ? "govuk-form-group--error" : "")">
+ <label class="govuk-label" for="narrative">Overall weekly update narrative</label>
+ <div id="narrative-hint" class="govuk-hint">Summarise what has happened this week, key progress, blockers, and decisions needed.</div>
+ @if (Err("narrative") != null)
+ {
+ <p id="narrative-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@Err("narrative")</p>
+ }
+ <textarea class="govuk-textarea @(Err("narrative") != null ? "govuk-textarea--error" : "")" id="narrative" name="narrative" rows="10" maxlength="4000" aria-invalid="@(Err("narrative") != null ? "true" : "false")" aria-describedby="@(Err("narrative") != null ? "narrative-error narrative-hint narrative-count" : "narrative-hint narrative-count")" @(isReadOnly ? "disabled" : "")>@Model.Narrative</textarea>
+ <div id="narrative-count" class="govuk-hint govuk-character-count__message" aria-live="polite">
+ <span class="char-current">@(Model.Narrative?.Length ?? 0)</span> of 4,000 characters
+                </div>
+            </div>
+
+            @await Html.PartialAsync("_ReportMilestonesSection", new ReportMilestonesSectionViewModel
+            {
+                SectionHeading = "Milestones",
+                SectionId = "weekly-report-milestones-heading",
+                IsReadOnly = isReadOnly,
+                Milestones = Model.Milestones,
+                RagStatuses = Model.RagStatuses
+            })
+
+            @if (!isReadOnly)
+            {
+ <div class="dfe-c-button-group">
+ <button type="submit" name="command" value="save" class="govuk-button weekly-report-save-draft" data-module="govuk-button">Save as draft</button>
+ <button type="submit" name="command" value="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Submit weekly report</button>
+ <a class="govuk-link" href="@Url.Action("Detail", "ModernWork", new { id = Model.WorkItemId })">Cancel</a>
+                </div>
+            }
+            else
+            {
+ <div class="dfe-c-button-group">
+ <a href="@Url.Action("Detail", "ModernWork", new { id = Model.WorkItemId })" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to work item</a>
+                </div>
+            }
+        </form>
+      </div>
+
+  </div>
+</div>
+</div>
+
+@section Scripts {
+<script nonce="@Context.Items["Nonce"]">
+(function () {
+    function updateCharCount(textareaId, countId) {
+        var ta = document.getElementById(textareaId);
+        var counter = document.querySelector('#' + countId + ' .char-current');
+        if (!ta || !counter) return;
+        function update() { counter.textContent = ta.value.length; }
+        ta.addEventListener('input', update);
+        update();
+    }
+    updateCharCount('narrative', 'narrative-count');
+    updateCharCount('peopleNarrative', 'peopleNarrative-count');
+    updateCharCount('ragJustification', 'ragJustification-count');
+    updateCharCount('pathToGreen', 'pathToGreen-count');
+
+    var ragRadios = document.querySelectorAll('#rag-radios input[type="radio"]');
+    var ptgGroup = document.getElementById('pathToGreen-group');
+    if (ptgGroup && document.getElementById('pathToGreen-error'))
+        ptgGroup.style.display = '';
+    if (ptgGroup && ragRadios.length) {
+        ragRadios.forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                var name = (this.getAttribute('data-rag-name') || '').toLowerCase();
+                ptgGroup.style.display = (name === 'green') ? 'none' : '';
+            });
+        });
+    }
+})();
+</script>
+}
