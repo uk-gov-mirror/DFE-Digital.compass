@@ -1,6 +1,8 @@
+using System.Globalization;
 using Compass.Data;
 using Compass.Models;
 using Compass.Models.Modern.Work;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace Compass.Services.Modern;
@@ -16,6 +18,72 @@ public static class MilestoneReportHelper
     public static bool IsCompletedStatus(string? status) =>
         string.Equals(status, "complete", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(status, "cancelled", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Parses <c>prefix[id]</c> form fields without falling back to unrelated keys (e.g. antiforgery token).
+    /// </summary>
+    public static Dictionary<int, string>? ParsePostedIntKeyStringDictionary(IFormCollection form, string prefix)
+    {
+        var result = new Dictionary<int, string>();
+        var keyPrefix = prefix + "[";
+        foreach (var key in form.Keys)
+        {
+            if (string.IsNullOrEmpty(key) ||
+                !key.StartsWith(keyPrefix, StringComparison.Ordinal) ||
+                !key.EndsWith(']'))
+            {
+                continue;
+            }
+
+            var idPart = key[keyPrefix.Length..^1];
+            if (!int.TryParse(idPart, NumberStyles.Integer, CultureInfo.InvariantCulture, out var milestoneId))
+            {
+                continue;
+            }
+
+            result[milestoneId] = form[key].ToString();
+        }
+
+        return result.Count == 0 ? null : result;
+    }
+
+    /// <summary>
+    /// Parses <c>prefix[id]</c> form fields without falling back to unrelated keys (e.g. antiforgery token).
+    /// </summary>
+    public static Dictionary<int, int?>? ParsePostedIntKeyNullableIntDictionary(IFormCollection form, string prefix)
+    {
+        var result = new Dictionary<int, int?>();
+        var keyPrefix = prefix + "[";
+        foreach (var key in form.Keys)
+        {
+            if (string.IsNullOrEmpty(key) ||
+                !key.StartsWith(keyPrefix, StringComparison.Ordinal) ||
+                !key.EndsWith(']'))
+            {
+                continue;
+            }
+
+            var idPart = key[keyPrefix.Length..^1];
+            if (!int.TryParse(idPart, NumberStyles.Integer, CultureInfo.InvariantCulture, out var milestoneId))
+            {
+                continue;
+            }
+
+            var raw = form[key].ToString();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                result[milestoneId] = null;
+                continue;
+            }
+
+            if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ragId))
+            {
+                result[milestoneId] = ragId;
+            }
+        }
+
+        return result.Count == 0 ? null : result;
+    }
 
     public static async Task<List<ReportMilestoneRowViewModel>> LoadReportMilestoneRowsAsync(
         CompassDbContext context,
