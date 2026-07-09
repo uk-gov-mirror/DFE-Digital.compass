@@ -936,14 +936,15 @@ public partial class ModernWorkController : Controller
         int id, int year, int month,
         string? narrative, string? peopleNarrative, decimal? permFte, decimal? mspFte,
         int? ragStatusId, string? ragJustification, string? pathToGreen,
-        [FromForm] Dictionary<int, string>? milestoneStatus,
-        [FromForm] Dictionary<int, int?>? milestoneRagStatusId,
-        [FromForm] Dictionary<int, string>? milestoneUpdateNote,
         string? command,
         CancellationToken cancellationToken = default)
     {
         if (month < 1 || month > 12)
             return BadRequest("Invalid month.");
+
+        var milestoneStatus = MilestoneReportHelper.ParsePostedIntKeyStringDictionary(Request.Form, "milestoneStatus");
+        var milestoneRagStatusId = MilestoneReportHelper.ParsePostedIntKeyNullableIntDictionary(Request.Form, "milestoneRagStatusId");
+        var milestoneUpdateNote = MilestoneReportHelper.ParsePostedIntKeyStringDictionary(Request.Form, "milestoneUpdateNote");
 
         var userEmail = User.Identity?.Name;
         if (string.IsNullOrEmpty(userEmail))

@@ -127,14 +127,15 @@ public partial class ModernWorkController
         int id, int year, int week,
         string? narrative, string? peopleNarrative, decimal? permFte, decimal? mspFte,
         int? ragStatusId, string? ragJustification, string? pathToGreen,
-        [FromForm] Dictionary<int, string>? milestoneStatus,
-        [FromForm] Dictionary<int, int?>? milestoneRagStatusId,
-        [FromForm] Dictionary<int, string>? milestoneUpdateNote,
         string? command,
         CancellationToken cancellationToken = default)
     {
         if (week < 1 || week > 53)
             return BadRequest("Invalid week.");
+
+        var milestoneStatus = MilestoneReportHelper.ParsePostedIntKeyStringDictionary(Request.Form, "milestoneStatus");
+        var milestoneRagStatusId = MilestoneReportHelper.ParsePostedIntKeyNullableIntDictionary(Request.Form, "milestoneRagStatusId");
+        var milestoneUpdateNote = MilestoneReportHelper.ParsePostedIntKeyStringDictionary(Request.Form, "milestoneUpdateNote");
 
         if (!await _weeklyUpdateService.IsProjectInWeeklyReportingScopeAsync(id, cancellationToken))
             return NotFound();
