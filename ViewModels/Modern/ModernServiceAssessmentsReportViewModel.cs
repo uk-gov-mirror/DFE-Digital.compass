@@ -72,6 +72,20 @@ public class SasAssessorLeagueRowVm
     public int Red { get; set; }
     public int Amber { get; set; }
     public int Green { get; set; }
+    /// <summary>Panel assignments in the league table period (for drill-down).</summary>
+    public IReadOnlyList<SasAssessorLeagueAssignmentVm> Assignments { get; set; } = Array.Empty<SasAssessorLeagueAssignmentVm>();
+}
+
+public class SasAssessorLeagueAssignmentVm
+{
+    public int AssessmentId { get; set; }
+    public string Name { get; set; } = "";
+    public string PanelRole { get; set; } = "";
+    public string Type { get; set; } = "";
+    public string Phase { get; set; } = "";
+    public string Status { get; set; } = "";
+    public string Outcome { get; set; } = "";
+    public DateTime? AssessmentDateTime { get; set; }
 }
 
 public class SasStandardsAnalysisVm

@@ -2749,6 +2749,47 @@ dialog.fips-cmdb-sync-modal.dfe-f-modal .dfe-f-modal__panel {
     display: none !important;
 }
 
+.sas-league-drill {
+    cursor: pointer;
+    border: none;
+    background: #f3f2f1;
+    color: #1d70b8;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+
+.sas-league-drill:hover,
+.sas-league-drill:focus {
+    background: #e8f0fa;
+    text-decoration-style: solid;
+    outline: 2px solid #fd0;
+    outline-offset: 1px;
+}
+
+.sas-league-drill--active,
+.sas-league-drill[aria-expanded="true"] {
+    background: #e8f0fa;
+    color: #003078;
+    font-weight: 700;
+    text-decoration-style: solid;
+}
+
+.sas-league-detail__cell {
+    background: #f8f8f8;
+    border-top: none;
+    padding-top: 0.25rem;
+    padding-bottom: 1rem;
+}
+
+.sas-league-detail[hidden] {
+    display: none;
+}
+
+.sas-league-detail__item[hidden] {
+    display: none;
+}
+
 .sas-rpt__tab-panel[hidden] {
     display: none !important;
 }

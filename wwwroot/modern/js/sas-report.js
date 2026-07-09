@@ -102,8 +102,97 @@
       }
     }
 
+    var filterLabels = {
+      assessments: 'Service assessments',
+      'peer-reviews': 'Peer reviews',
+      panels: 'Panel assignments',
+      published: 'Published panel assignments',
+      red: 'Red outcomes',
+      amber: 'Amber outcomes',
+      green: 'Green outcomes'
+    };
+
+    function assignmentMatchesFilter(item, filter) {
+      var type = item.getAttribute('data-sas-type') || '';
+      var status = item.getAttribute('data-sas-status') || '';
+      var outcome = item.getAttribute('data-sas-outcome') || '';
+      if (filter === 'assessments') return type === 'service assessment';
+      if (filter === 'peer-reviews') return type === 'peer review';
+      if (filter === 'published') return status === 'published';
+      if (filter === 'red') return outcome === 'red';
+      if (filter === 'amber') return outcome === 'amber';
+      if (filter === 'green') return outcome === 'green';
+      return true;
+    }
+
+    function collapseAllLeagueDetails() {
+      leagueRoot.querySelectorAll('.sas-league-drill').forEach(function (btn) {
+        btn.setAttribute('aria-expanded', 'false');
+        btn.classList.remove('sas-league-drill--active');
+      });
+      leagueRoot.querySelectorAll('.sas-league-detail').forEach(function (detailRow) {
+        detailRow.hidden = true;
+      });
+    }
+
+    function resetLeagueDrills(exceptBtn) {
+      var keepDetailId = exceptBtn ? exceptBtn.getAttribute('aria-controls') : null;
+      leagueRoot.querySelectorAll('.sas-league-drill').forEach(function (btn) {
+        if (btn === exceptBtn) return;
+        btn.setAttribute('aria-expanded', 'false');
+        btn.classList.remove('sas-league-drill--active');
+      });
+      leagueRoot.querySelectorAll('.sas-league-detail').forEach(function (detailRow) {
+        if (keepDetailId && detailRow.id === keepDetailId) return;
+        detailRow.hidden = true;
+      });
+    }
+
+    function applyLeagueFilter(detailRow, filter) {
+      var visibleCount = 0;
+      detailRow.querySelectorAll('.sas-league-detail__item').forEach(function (item) {
+        var show = assignmentMatchesFilter(item, filter);
+        item.hidden = !show;
+        if (show) visibleCount += 1;
+      });
+      return visibleCount;
+    }
+
+    function setLeagueDetailExpanded(btn) {
+      var detailId = btn.getAttribute('data-expand-id');
+      var filter = btn.getAttribute('data-sas-league-filter') || 'panels';
+      var detailRow = detailId ? document.getElementById(detailId) : null;
+      if (!detailRow) return;
+
+      resetLeagueDrills(btn);
+
+      var assessorName = '';
+      var parentRow = btn.closest('[data-sas-league-row]');
+      if (parentRow) {
+        var nameCell = parentRow.querySelector('th[scope="row"]');
+        if (nameCell) {
+          assessorName = nameCell.childNodes[0] ? String(nameCell.childNodes[0].textContent || '').trim() : '';
+        }
+      }
+
+      var visibleCount = applyLeagueFilter(detailRow, filter);
+      var labelEl = detailRow.querySelector('.sas-league-detail__label');
+      if (labelEl) {
+        var filterLabel = filterLabels[filter] || 'Panel assignments';
+        labelEl.innerHTML =
+          visibleCount.toLocaleString('en-GB') + ' ' + filterLabel.toLowerCase() +
+          (assessorName ? ' for <strong>' + assessorName.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</strong>' : '');
+      }
+
+      detailRow.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      btn.classList.add('sas-league-drill--active');
+      detailRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
     function activateLeagueYear(key) {
       if (!key) return;
+      collapseAllLeagueDetails();
       Object.keys(leaguePanels).forEach(function (k) {
         var panel = leaguePanels[k];
         if (!panel) return;
@@ -134,6 +223,25 @@
     if (defaultLeagueBtn) {
       activateLeagueYear(defaultLeagueBtn.getAttribute('data-sas-league-year'));
     }
+
+    leagueRoot.addEventListener('click', function (e) {
+      var btn = e.target.closest('.sas-league-drill');
+      if (!btn || !leagueRoot.contains(btn)) return;
+      var isOpen = btn.getAttribute('aria-expanded') === 'true' && btn.classList.contains('sas-league-drill--active');
+      if (isOpen) {
+        collapseAllLeagueDetails();
+        return;
+      }
+      setLeagueDetailExpanded(btn);
+    });
+
+    leagueRoot.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var btn = e.target.closest('.sas-league-drill');
+      if (!btn || !leagueRoot.contains(btn)) return;
+      e.preventDefault();
+      btn.click();
+    });
   }
 
   window.SasReport = window.SasReport || {};
