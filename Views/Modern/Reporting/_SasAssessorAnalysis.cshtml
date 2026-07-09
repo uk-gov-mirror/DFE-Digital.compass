@@ -228,7 +228,7 @@
     </div>
 
     <h3 class="govuk-heading-m" id="sas-assessor-league-h">Assessor league table</h3>
-    <p class="govuk-hint govuk-!-margin-bottom-3">Ranked by panel assignments in the selected year (calendar year from assessment date). Assessments and peer reviews are counts by assessment type. Red, amber, and green are panel assignment outcomes in that period.</p>
+    <p class="govuk-hint govuk-!-margin-bottom-3">Ranked by panel assignments in the selected year (calendar year from assessment date). Assessments and peer reviews are counts by assessment type. Red, amber, and green are panel assignment outcomes in that period. Select a number to view the underlying panel assignments.</p>
 
     <div id="sas-assessor-league" class="govuk-!-margin-bottom-6">
       @if (aa.LeagueYearTabs.Count > 1)
@@ -255,7 +255,11 @@
              class="sas-assessor-league-panel tab-pane@(yearTab.IsDefault ? " on" : "")"
              role="tabpanel"
              aria-labelledby="sas-league-btn-@yearTab.Key">
-          @await Html.PartialAsync("_SasAssessorLeagueTable", yearTab.Rows)
+          @await Html.PartialAsync("_SasAssessorLeagueTable", yearTab.Rows, new ViewDataDictionary(ViewData)
+          {
+              { "SasLeagueYearKey", yearTab.Key },
+              { "SasReportBaseUrl", Model.SasReportBaseUrl }
+          })
         </div>
       }
     </div>

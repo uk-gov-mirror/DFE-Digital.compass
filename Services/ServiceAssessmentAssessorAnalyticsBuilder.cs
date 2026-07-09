@@ -129,7 +129,8 @@ public static class ServiceAssessmentAssessorAnalyticsBuilder
                     PublishedCount = published,
                     Red = red,
                     Amber = amber,
-                    Green = green
+                    Green = green,
+                    Assignments = panel.Select(MapLeagueAssignment).ToList()
                 };
             })
             .Where(r => r is not null)
@@ -186,6 +187,19 @@ public static class ServiceAssessmentAssessorAnalyticsBuilder
 
     private static int CountByType(IReadOnlyList<SasAssessorAssessmentRow> panel, string typeLabel) =>
         panel.Count(x => string.Equals(x.Type?.Trim(), typeLabel, StringComparison.OrdinalIgnoreCase));
+
+    private static SasAssessorLeagueAssignmentVm MapLeagueAssignment(SasAssessorAssessmentRow assignment) =>
+        new()
+        {
+            AssessmentId = assignment.AssessmentID,
+            Name = assignment.Name?.Trim() ?? "",
+            PanelRole = string.IsNullOrWhiteSpace(assignment.PanelRole) ? "—" : assignment.PanelRole!.Trim(),
+            Type = string.IsNullOrWhiteSpace(assignment.Type) ? "—" : assignment.Type!.Trim(),
+            Phase = string.IsNullOrWhiteSpace(assignment.Phase) ? "—" : assignment.Phase!.Trim(),
+            Status = string.IsNullOrWhiteSpace(assignment.Status) ? "—" : assignment.Status!.Trim(),
+            Outcome = NormalizeOutcome(assignment.Outcome),
+            AssessmentDateTime = assignment.AssessmentDateTime
+        };
 
     private static string FormatName(string? first, string? last, string? email)
     {
