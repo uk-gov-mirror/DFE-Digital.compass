@@ -5,6 +5,7 @@ using Compass.Configuration;
 using Compass.Data;
 using Compass.Models;
 using Compass.Services;
+using Compass.Services.Dashboard;
 using Compass.Models.Modern.Work;
 using Compass.ViewModels.Dashboard;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +21,7 @@ public partial class ModernWorkService : IModernWorkService
 {
     private readonly CompassDbContext _db;
     private readonly IMonthlyUpdateService _monthlyUpdateService;
+    private readonly IWeeklyUpdateService _weeklyUpdateService;
     private readonly IPermissionService _permissionService;
     private readonly IBusinessAreaAdminService _businessAreaAdmins;
     private readonly IBusinessAreaLeadershipService _businessAreaLeadership;
@@ -29,6 +31,7 @@ public partial class ModernWorkService : IModernWorkService
     private readonly IHostEnvironment _hostEnvironment;
     private readonly WorkRegisterPerfFileLog _workRegisterPerfFileLog;
     private readonly IMemoryCache _cache;
+    private readonly IYourTasksViewModelBuilder _yourTasksBuilder;
 
     private const string FilterLookupsCacheKey = "modern-work-register-filter-lookups-v1";
     private const string PrimaryContactsCacheKey = "modern-work-register-primary-contacts-v1";
@@ -36,6 +39,7 @@ public partial class ModernWorkService : IModernWorkService
     public ModernWorkService(
         CompassDbContext db,
         IMonthlyUpdateService monthlyUpdateService,
+        IWeeklyUpdateService weeklyUpdateService,
         IPermissionService permissionService,
         IBusinessAreaAdminService businessAreaAdmins,
         IBusinessAreaLeadershipService businessAreaLeadership,
@@ -44,10 +48,12 @@ public partial class ModernWorkService : IModernWorkService
         IOptions<WorkRegisterDiagnosticsOptions> workRegisterDiagnostics,
         IHostEnvironment hostEnvironment,
         WorkRegisterPerfFileLog workRegisterPerfFileLog,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        IYourTasksViewModelBuilder yourTasksBuilder)
     {
         _db = db;
         _monthlyUpdateService = monthlyUpdateService;
+        _weeklyUpdateService = weeklyUpdateService;
         _permissionService = permissionService;
         _businessAreaAdmins = businessAreaAdmins;
         _businessAreaLeadership = businessAreaLeadership;
@@ -57,6 +63,7 @@ public partial class ModernWorkService : IModernWorkService
         _hostEnvironment = hostEnvironment;
         _workRegisterPerfFileLog = workRegisterPerfFileLog;
         _cache = cache;
+        _yourTasksBuilder = yourTasksBuilder;
     }
 
     /// <summary>
@@ -736,6 +743,30 @@ public partial class ModernWorkService : IModernWorkService
             w.MonthlyUpdates.Add(monthly);
         }
 
+        foreach (var wu in p.WeeklyWorkUpdates)
+        {
+            w.WeeklyUpdates.Add(new WeeklyUpdate
+            {
+                Id = wu.Id,
+                WorkItemId = p.Id,
+                IsoYear = wu.IsoYear,
+                IsoWeek = wu.IsoWeek,
+                WeekStartDate = wu.WeekStartDate,
+                WeekEndDate = wu.WeekEndDate,
+                PeriodLabel = WeeklyUpdateService.FormatPeriodLabel(wu.WeekStartDate, wu.WeekEndDate),
+                Narrative = wu.Narrative,
+                RagStatusId = wu.DraftRagStatusLookupId,
+                RagJustification = wu.DraftRagJustification,
+                PathToGreen = wu.DraftPathToGreen,
+                SubmittedAt = wu.SubmittedAt,
+                SubmittedByUserId = wu.CreatedByUserId,
+                SubmittedBy = wu.CreatedByName ?? wu.CreatedByUser?.Name,
+                PermFte = wu.WeeklyPermFte,
+                MspFte = wu.WeeklyMspFte,
+                PeopleNarrative = wu.PeopleNarrative
+            });
+        }
+
         foreach (var m in p.Milestones.Where(x => !x.IsDeleted))
             w.Milestones.Add(m);
 
@@ -819,7 +850,7 @@ public partial class ModernWorkService : IModernWorkService
             .Include(x => x.MonthlyUpdates).ThenInclude(mu => mu.CreatedByUser)
             .Include(x => x.MonthlyUpdates).ThenInclude(mu => mu.MonthlyUpdateNarratives)
             .Include(x => x.MonthlyUpdates).ThenInclude(mu => mu.DraftRagStatusLookup)
-            .Include(x => x.Milestones)
+            .Include(x => x.Milestones).ThenInclude(m => m.RagStatusLookup)
             .Include(x => x.RagStatusLookup)
             .Include(x => x.PhaseLookup)
             .Include(x => x.DeliveryPriority)
@@ -1089,6 +1120,21 @@ public partial class ModernWorkService : IModernWorkService
 
         var reportingGapCount = monthlyReportingWindowOpen ? mrDraft + mrMissing : 0;
 
+        var showRaidIssues = controller.ViewBag.ShowRaidNavigation as bool? == true;
+        var yourTasks = await _yourTasksBuilder.BuildAsync(
+            currentUser,
+            userEmail,
+            controller.Url,
+            showRaidIssues,
+            new YourTasksLinkOptions
+            {
+                MonthlyReportingHref = "#work-dashboard-table",
+                PerformanceCommissionsHref = controller.Url.Action("Index", "ModernPerformance") ?? "/modern/performance/commissions",
+                AllWorkHref = controller.Url.Action("AllWork", "ModernWork") ?? "/modern/work/all"
+            },
+            "work-dashboard-task",
+            cancellationToken);
+
         controller.ViewBag.MainNavSection = "work";
         controller.ViewBag.SubNavItem = "work-dashboard";
         controller.ViewBag.AssignedCount = assignedActivePaused.Count;
@@ -1131,6 +1177,7 @@ public partial class ModernWorkService : IModernWorkService
         controller.ViewBag.ReportingTabCount = reportingGapCount;
         controller.ViewBag.CurrentPeriodLabel = mrPeriodLabel;
         controller.ViewBag.CurrentPeriodDueDate = mrDueDate;
+        controller.ViewBag.YourTasks = yourTasks;
     }
 
     private static string NormalizeRegisterSortKey(string? sort) =>
@@ -1945,6 +1992,34 @@ public partial class ModernWorkService : IModernWorkService
                     if (!string.IsNullOrWhiteSpace(cssClass))
                         mu.RagCssClass = cssClass;
                 });
+        }
+    }
+
+    private static void EnrichWeeklyUpdateRagDisplay(
+        WorkItem work,
+        Project p,
+        IReadOnlyDictionary<int, RagStatusLookup> ragLookupById)
+    {
+        var sourceById = p.WeeklyWorkUpdates.ToDictionary(wu => wu.Id);
+        foreach (var wu in work.WeeklyUpdates)
+        {
+            if (!sourceById.TryGetValue(wu.Id, out var source))
+                continue;
+
+            if (source.DraftRagStatusLookupId is int draftId && draftId > 0)
+            {
+                wu.RagStatusId = draftId;
+                if (source.DraftRagStatusLookup is { } draft)
+                {
+                    wu.RagDisplayName = draft.Name;
+                    wu.RagCssClass = draft.CssClass;
+                }
+                else if (ragLookupById.TryGetValue(draftId, out var lookup))
+                {
+                    wu.RagDisplayName = lookup.Name;
+                    wu.RagCssClass = lookup.CssClass;
+                }
+            }
         }
     }
 }

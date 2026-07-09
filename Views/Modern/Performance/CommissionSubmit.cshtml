@@ -80,6 +80,39 @@
 }
 else
 {
+  @if (IsSubmittedView(sub.Status))
+  {
+    <div class="govuk-notification-banner govuk-!-margin-bottom-4" role="region" aria-labelledby="commission-submit-status-banner-title" data-module="govuk-notification-banner">
+      <div class="govuk-notification-banner__header">
+        <h2 class="govuk-notification-banner__title" id="commission-submit-status-banner-title">Important</h2>
+      </div>
+      <div class="govuk-notification-banner__content">
+        @if (Model.IsPastDue)
+        {
+          <p class="govuk-notification-banner__heading">This return has been submitted and is locked</p>
+          <p class="govuk-body govuk-!-margin-bottom-0">The commission due date has passed, so metrics cannot be edited.</p>
+        }
+        else
+        {
+          <p class="govuk-notification-banner__heading">Unsubmit this return to edit metrics</p>
+          <p class="govuk-body">This return has been submitted and metrics are locked. Unsubmit it first to change values and submit again while the reporting window is open.</p>
+          <form method="post" asp-controller="ModernPerformance" asp-action="CommissionUnsubmit" class="govuk-!-margin-bottom-0"
+                data-confirm-title="Unsubmit this return?"
+                data-confirm-message="You will be able to edit metrics and submit again.">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@sub.Id" />
+            <input type="hidden" name="returnTab" value="@Model.ReturnTab" />
+            <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Unsubmit</button>
+          </form>
+        }
+        @if (sub.SubmittedDate.HasValue)
+        {
+          <p class="govuk-body-s govuk-hint govuk-!-margin-top-3 govuk-!-margin-bottom-0">Submitted @sub.SubmittedDate.Value.ToString("dd MMM yyyy HH:mm")</p>
+        }
+      </div>
+    </div>
+  }
+
  <div class="dfe-f-table-wrapper dfe-c-mb-4" data-module="dfe-f-table">
   <div class="govuk-visually-hidden" aria-live="polite" data-dfe-table-sort-live></div>
     <table class="govuk-table">
@@ -184,28 +217,6 @@ else
  <button type="submit" class="govuk-button govuk-button--secondary">Update comments</button>
       </form>
     }
-
- <div class="govuk-button-group">
-      @if (Model.IsPastDue)
-      {
- <p class="govuk-body dfe-c-text-muted govuk-!-margin-bottom-0">This submission is locked because the commission due date has passed.</p>
-      }
-      else
-      {
-        <form method="post" asp-controller="ModernPerformance" asp-action="CommissionUnsubmit"
-              data-confirm-title="Unsubmit this return?"
-              data-confirm-message="You will be able to edit metrics and submit again.">
-          @Html.AntiForgeryToken()
-          <input type="hidden" name="id" value="@sub.Id" />
-          <input type="hidden" name="returnTab" value="@Model.ReturnTab" />
- <button type="submit" class="govuk-button govuk-button--warning">Unsubmit</button>
-        </form>
-      }
-      @if (sub.SubmittedDate.HasValue)
-      {
- <p class="govuk-body-s dfe-c-text-muted govuk-!-margin-bottom-0">Submitted @sub.SubmittedDate.Value.ToString("dd MMM yyyy HH:mm")</p>
-      }
-    </div>
   }
   else if (!Model.IsReadOnly && Model.MetricValues.All(m => m.IsComplete))
   {

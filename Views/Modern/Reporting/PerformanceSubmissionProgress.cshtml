@@ -253,7 +253,7 @@
       </div>
       <div id="perf-sp-toggle-metrics-content" class="dfe-f-toggle__content">
         <div class="dfe-f-toggle__body govuk-body">
-          <p class="dfe-c-body-s dfe-c-text-muted govuk-!-margin-bottom-2">Completion rate for each active performance metric across in-scope products.</p>
+          <p class="dfe-c-body-s dfe-c-text-muted govuk-!-margin-bottom-2">Completion rate for each active performance metric across in-scope products. Select a completed count to view the services and values reported for that metric.</p>
           <div class="dfe-f-table-wrapper" data-module="dfe-f-table">
             <div class="govuk-visually-hidden" aria-live="polite" data-dfe-table-sort-live></div>
             <table class="govuk-table govuk-!-margin-bottom-0" id="perf-sp-metrics-table">
@@ -270,10 +270,27 @@
                 {
                   var mPct = metric.CompletionPercent;
                   var mTier = mPct >= 90m ? "mr-metric-bar-fill--green" : (mPct >= 60m ? "mr-metric-bar-fill--amber" : (mPct >= 20m ? "mr-metric-bar-fill--red" : "mr-metric-bar-fill--black"));
+                  var metricExpandId = $"perf-sp-metric-{metric.MetricId}";
+                  var hasCompleted = metric.CompletedCount > 0;
                   <tr class="govuk-table__row">
                     <th scope="row" class="govuk-table__cell">@metric.Name</th>
                     <td class="govuk-table__cell">@metric.ApplicableProducts</td>
-                    <td class="govuk-table__cell">@metric.CompletedCount</td>
+                    <td class="govuk-table__cell">
+                      @if (hasCompleted)
+                      {
+                        <button type="button"
+                                class="perf-sp-metric-drill"
+                                data-expand-id="@metricExpandId"
+                                aria-expanded="false"
+                                aria-controls="@metricExpandId">
+                          @metric.CompletedCount
+                        </button>
+                      }
+                      else
+                      {
+                        <span class="dfe-c-text-muted">0</span>
+                      }
+                    </td>
                     <td class="govuk-table__cell">
                       <div class="mr-metric-inline-bar">
                         <div class="mr-metric-bar-track" aria-hidden="true">
@@ -283,6 +300,56 @@
                       </div>
                     </td>
                   </tr>
+                  @if (hasCompleted)
+                  {
+                    <tr class="perf-sp-metric-detail" id="@metricExpandId" hidden>
+                      <td colspan="4" class="govuk-table__cell perf-sp-metric-detail__cell">
+                        <p class="govuk-body-s dfe-c-text-muted govuk-!-margin-top-0 govuk-!-margin-bottom-2">
+                          @metric.CompletedCount service@(metric.CompletedCount == 1 ? "" : "s") with completed data for <strong>@metric.Name</strong>
+                        </p>
+                        <div class="dfe-f-table-wrapper" data-module="dfe-f-table">
+                          <table class="govuk-table govuk-table--small-text-until-tablet dfe-f-table--condensed govuk-!-margin-bottom-0">
+                            <caption class="govuk-visually-hidden">Reported data for @metric.Name</caption>
+                            <thead class="govuk-table__head">
+                              <tr class="govuk-table__row">
+                                <th scope="col" class="govuk-table__header">Service</th>
+                                <th scope="col" class="govuk-table__header">Business area</th>
+                                <th scope="col" class="govuk-table__header">Reported value</th>
+                                <th scope="col" class="govuk-table__header">Notes</th>
+                              </tr>
+                            </thead>
+                            <tbody class="govuk-table__body">
+                              @foreach (var product in metric.CompletedProducts)
+                              {
+                                var notes = new List<string>();
+                                if (!string.IsNullOrWhiteSpace(product.NotCapturedReason))
+                                  notes.Add($"Not captured: {product.NotCapturedReason.Trim()}");
+                                if (!string.IsNullOrWhiteSpace(product.ReasonForDifference))
+                                  notes.Add($"Reason for difference: {product.ReasonForDifference.Trim()}");
+                                <tr class="govuk-table__row">
+                                  <th scope="row" class="govuk-table__cell">
+                                    <a class="govuk-link govuk-link--no-visited-state" href="@Url.Action("Submission", "ModernPerformance", new { commissionId = c!.Id, documentId = product.ProductDocumentId, returnTab = "all" })">@product.ProductTitle</a>
+                                  </th>
+                                  <td class="govuk-table__cell">@product.BusinessArea</td>
+                                  <td class="govuk-table__cell">@product.DisplayValue</td>
+                                  <td class="govuk-table__cell">
+                                    @if (notes.Count > 0)
+                                    {
+                                      @string.Join(" · ", notes)
+                                    }
+                                    else
+                                    {
+                                      <span class="dfe-c-text-muted">—</span>
+                                    }
+                                  </td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  }
                 }
               </tbody>
             </table>
@@ -388,6 +455,36 @@
   .mr-metric-bar-fill--amber { background: #f47738; }
   .mr-metric-bar-fill--red { background: #d4351c; }
   .mr-metric-bar-fill--black { background: #0b0c0c; }
+  .perf-sp-metric-drill {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: #1d70b8;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+  .perf-sp-metric-drill:hover,
+  .perf-sp-metric-drill:focus {
+    text-decoration-style: solid;
+    outline: 2px solid #fd0;
+    outline-offset: 1px;
+  }
+  .perf-sp-metric-drill[aria-expanded="true"] {
+    font-weight: 700;
+    text-decoration-style: solid;
+  }
+  .perf-sp-metric-detail__cell {
+    background: #f8f8f8;
+    border-top: none;
+    padding-top: 0.25rem;
+    padding-bottom: 1rem;
+  }
+  .perf-sp-metric-detail[hidden] { display: none; }
   @@media (max-width: 768px) {
     #perf-submission-commission { width: min(100%, 32rem); min-width: 16rem; }
   }
@@ -408,6 +505,24 @@
       var cl = document.getElementById('perf-sp-collapse-all');
       if (ex) ex.addEventListener('click', function () { reportSectionPanelsSetExpanded(true); });
       if (cl) cl.addEventListener('click', function () { reportSectionPanelsSetExpanded(false); });
+
+      function setMetricDetailExpanded(btn, expanded) {
+        var detailId = btn.getAttribute('data-expand-id');
+        var detail = detailId ? document.getElementById(detailId) : null;
+        if (!detail) return;
+        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        detail.hidden = !expanded;
+      }
+
+      document.querySelectorAll('.perf-sp-metric-drill').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var isOpen = btn.getAttribute('aria-expanded') === 'true';
+          document.querySelectorAll('.perf-sp-metric-drill[aria-expanded="true"]').forEach(function (openBtn) {
+            if (openBtn !== btn) setMetricDetailExpanded(openBtn, false);
+          });
+          setMetricDetailExpanded(btn, !isOpen);
+        });
+      });
     });
   </script>
 }

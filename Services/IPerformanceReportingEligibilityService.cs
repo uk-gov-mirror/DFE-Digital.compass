@@ -33,10 +33,11 @@ public interface IPerformanceReportingEligibilityService
         string? fipsId,
         int year,
         int month,
-        PerformanceReportingEligibilityCache cache);
+        PerformanceReportingEligibilityCache cache,
+        string? cmdbSysId = null);
 
     /// <summary>
-    /// Checks if a product is excluded for any month overlapping a commission period.
+    /// Checks if a product is excluded for any month from the commission reporting period through its due date.
     /// </summary>
     bool IsProductExcludedForCommission(
         ProductDto product,

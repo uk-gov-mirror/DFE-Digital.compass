@@ -1,0 +1,48 @@
+@model Compass.Models.Modern.Work.WorkItem
+@using Compass.Models.Modern.Work
+@{
+  var weeklyPeriodsList = ViewBag.WeeklyReportingPeriodsList as IEnumerable<ReportingCyclePeriod> ?? Enumerable.Empty<ReportingCyclePeriod>();
+  var recentPeriods = weeklyPeriodsList.Take(6).ToList();
+  var olderPeriods = weeklyPeriodsList.Skip(6).ToList();
+}
+
+<div id="wd-weekly-updates" class="tab-pane">
+  <div class="mb4">
+    <h2 class="govuk-heading-m govuk-!-margin-bottom-0">Weekly updates</h2>
+    <p class="dfe-c-body-s muted dfe-c-mt-2">Submit a return for each working week when submissions are open. Period and due dates follow the schedule in Admin → Work reporting.</p>
+  </div>
+
+  @if (recentPeriods.Any())
+  {
+    ViewBag.WeeklyTablePeriods = recentPeriods;
+    @await Html.PartialAsync("_WorkItemWeeklyUpdatesTableBody", Model)
+
+    @if (olderPeriods.Any())
+    {
+      <div class="dfe-f-toggle govuk-!-margin-top-4" data-module="dfe-f-toggle" id="weekly-updates-older-toggle">
+        <div class="dfe-f-toggle__title-wrapper">
+          <h3 class="dfe-f-toggle__heading govuk-!-margin-bottom-0">
+            <button type="button"
+                    class="dfe-f-toggle__button"
+                    id="weekly-updates-older-toggle-btn"
+                    aria-expanded="false"
+                    aria-controls="weekly-updates-older-panel">
+              <span class="dfe-f-toggle__icon" aria-hidden="true"></span>
+              <span class="dfe-f-toggle__title">Older weeks (@olderPeriods.Count)</span>
+            </button>
+          </h3>
+        </div>
+        <div id="weekly-updates-older-panel" class="dfe-f-toggle__content" hidden>
+          <div class="dfe-f-toggle__body">
+            ViewBag.WeeklyTablePeriods = olderPeriods;
+            @await Html.PartialAsync("_WorkItemWeeklyUpdatesTableBody", Model)
+          </div>
+        </div>
+      </div>
+    }
+  }
+  else
+  {
+    <p class="dfe-c-body muted">Weekly reporting is not configured or this work item is not in scope. Configure weekly reporting in <a href="@Url.Action("WorkReporting", "ModernAdmin")" class="govuk-link govuk-link--no-visited-state">Admin → Work reporting</a>.</p>
+  }
+</div>

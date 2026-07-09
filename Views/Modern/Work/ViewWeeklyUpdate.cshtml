@@ -1,0 +1,174 @@
+@model Compass.Models.Modern.Work.WeeklyUpdate
+@using Compass.Models.Modern.Work
+@{
+    var work = ViewBag.WorkItem as WorkItem;
+    var reportMilestoneRows = ViewBag.ReportMilestoneRows as List<ReportMilestoneRowViewModel> ?? new List<ReportMilestoneRowViewModel>();
+    var ragStatusesDict = ViewBag.RagStatusesDict as Dictionary<int, string> ?? new Dictionary<int, string>();
+    var ragName = !string.IsNullOrWhiteSpace(Model.RagDisplayName)
+        ? Model.RagDisplayName
+        : (Model.RagStatusId.HasValue && ragStatusesDict.TryGetValue(Model.RagStatusId.Value, out string? rn) ? rn : null);
+    var submittedByName = ViewBag.SubmittedByName as string ?? Model.SubmittedBy ?? "—";
+    var ragJustification = Model.RagJustification;
+    var pathToGreen = Model.PathToGreen;
+    var isGreen = (ragName ?? "").Contains("green", StringComparison.OrdinalIgnoreCase);
+    var periodDue = ViewBag.PeriodDueDate as DateTime?;
+    ViewData["Title"] = $"Weekly update — {Model.PeriodLabel}";
+}
+@section Breadcrumbs {
+ <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Index", "ModernDashboard")">Home</a></li>
+ <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Dashboard", "ModernWork")">Work</a></li>
+ <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Detail", "ModernWork", new { id = Model.WorkItemId })#wd-weekly-updates">@(work?.Title ?? "Work item")</a></li>
+ <li class="govuk-breadcrumbs__list-item" aria-current="page">@Model.PeriodLabel</li>
+}
+
+<div id="sc-work-viewmonthlyupdate" class="modern-work-page">
+ @if (work != null)
+ {
+   @await Html.PartialAsync("_WorkItemChrome", work)
+ }
+
+<div class="govuk-grid-row modern-work-detail-layout govuk-!-margin-top-4">
+  <div class="govuk-grid-column-one-quarter-from-desktop modern-work-detail-layout__nav">
+    <div class="dfe-f-u-sticky govuk-!-margin-bottom-4 modern-work-detail-layout__nav-inner" style="--dfe-f-sticky-top: 1rem;">
+      @if (work != null)
+      {
+        @await Html.PartialAsync("_WorkItemSideNav", work)
+      }
+    </div>
+  </div>
+  <div class="govuk-grid-column-three-quarters-from-desktop modern-work-detail-main">
+
+ <div class="govuk-summary-card">
+ <div class="govuk-summary-card__title-wrapper">
+ <h2 class="govuk-summary-card__title">Submission summary</h2>
+        </div>
+ <div class="govuk-summary-card__content">
+ <dl class="govuk-summary-list govuk-!-margin-bottom-0">
+ <div class="govuk-summary-list__row">
+ <dt class="govuk-summary-list__key">Reporting period</dt>
+ <dd class="govuk-summary-list__value">@Model.PeriodLabel</dd>
+          </div>
+ <div class="govuk-summary-list__row">
+ <dt class="govuk-summary-list__key">Submitted</dt>
+ <dd class="govuk-summary-list__value">
+ <span class="dfe-f-badge dfe-f-badge--small dfe-f-badge--green govuk-!-margin-right-2">Submitted</span>
+            @(Model.SubmittedAt?.ToString("d MMMM yyyy 'at' HH:mm") ?? "—")<span aria-hidden="true"> · </span>by @submittedByName
+          </dd>
+          </div>
+          @if (periodDue.HasValue)
+          {
+ <div class="govuk-summary-list__row">
+ <dt class="govuk-summary-list__key">Return deadline</dt>
+ <dd class="govuk-summary-list__value">@periodDue.Value.ToString("d MMMM yyyy")</dd>
+            </div>
+          }
+ <div class="govuk-summary-list__row">
+ <dt class="govuk-summary-list__key">RAG at submission</dt>
+ <dd class="govuk-summary-list__value">
+              @if (string.IsNullOrWhiteSpace(ragName))
+              {
+ <span class="govuk-hint govuk-!-margin-bottom-0">—</span>
+              }
+              else
+              {
+ <span class="@WorkBadgeCss.RagCompactBadgeClass(string.IsNullOrWhiteSpace(ragName) ? null : ragName)">@ragName.ToUpperInvariant()</span>
+              }
+            </dd>
+          </div>
+        </dl>
+        </div>
+ </div>
+
+ <div class="govuk-summary-card govuk-!-margin-top-6">
+ <div class="govuk-summary-card__title-wrapper">
+ <h2 class="govuk-summary-card__title">Weekly update</h2>
+        </div>
+ <div class="govuk-summary-card__content">
+
+ <section class="monthly-return-section govuk-!-margin-bottom-6" aria-labelledby="monthly-return-people-heading">
+ <h3 class="govuk-heading-m govuk-!-margin-top-0" id="monthly-return-people-heading">People</h3>
+ <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-0">
+ <div class="govuk-summary-list__row">
+ <dt class="govuk-summary-list__key">Permanent FTE</dt>
+ <dd class="govuk-summary-list__value">@(Model.PermFte?.ToString("0.##") ?? "—")</dd>
+            </div>
+ <div class="govuk-summary-list__row">
+ <dt class="govuk-summary-list__key">MSC number</dt>
+ <dd class="govuk-summary-list__value">@(Model.MspFte?.ToString("0.##") ?? "—")</dd>
+            </div>
+          </dl>
+
+ <h4 class="govuk-heading-s govuk-!-margin-top-6" id="monthly-return-people-narrative-heading">Narrative on people this week</h4>
+          @if (string.IsNullOrWhiteSpace(Model.PeopleNarrative))
+          {
+ <p class="monthly-return-readonly-text monthly-return-readonly-text--empty govuk-body govuk-!-margin-bottom-0" aria-labelledby="monthly-return-people-narrative-heading">Not provided</p>
+          }
+          else
+          {
+ <div class="monthly-return-readonly-text govuk-body govuk-!-margin-bottom-0" aria-labelledby="monthly-return-people-narrative-heading" style="white-space:pre-wrap;">@Model.PeopleNarrative</div>
+          }
+        </section>
+
+ <section class="monthly-return-section" aria-labelledby="monthly-return-delivery-heading">
+ <h3 class="govuk-heading-m" id="monthly-return-delivery-heading">Delivery confidence and update</h3>
+ <p class="govuk-hint govuk-!-margin-bottom-2">Delivery confidence for this reporting period.</p>
+
+ <h4 class="govuk-heading-s" id="monthly-return-rag-justification-heading">Justification</h4>
+          @if (string.IsNullOrWhiteSpace(ragJustification))
+          {
+ <p class="monthly-return-readonly-text monthly-return-readonly-text--empty govuk-body" aria-labelledby="monthly-return-rag-justification-heading">Not provided</p>
+          }
+          else
+          {
+ <div class="monthly-return-readonly-text govuk-body" aria-labelledby="monthly-return-rag-justification-heading">@ragJustification</div>
+          }
+
+          @if (!isGreen)
+          {
+ <h4 class="govuk-heading-s govuk-!-margin-top-6" id="monthly-return-path-heading">Path to green</h4>
+            @if (string.IsNullOrWhiteSpace(pathToGreen))
+            {
+ <p class="monthly-return-readonly-text monthly-return-readonly-text--empty govuk-body govuk-!-margin-bottom-0" aria-labelledby="monthly-return-path-heading">Not provided</p>
+            }
+            else
+            {
+ <div class="monthly-return-readonly-text govuk-body govuk-!-margin-bottom-0" aria-labelledby="monthly-return-path-heading">@pathToGreen</div>
+            }
+          }
+
+ <h4 class="govuk-heading-s govuk-!-margin-top-6" id="monthly-return-narrative-heading">Overall weekly update narrative</h4>
+          @if (string.IsNullOrWhiteSpace(Model.Narrative))
+          {
+ <p class="monthly-return-readonly-text monthly-return-readonly-text--empty govuk-body govuk-!-margin-bottom-0" id="monthly-return-narrative-body" aria-labelledby="monthly-return-narrative-heading">Not provided</p>
+          }
+          else
+          {
+ <div class="monthly-return-readonly-text govuk-body govuk-!-margin-bottom-0" id="monthly-return-narrative-body" aria-labelledby="monthly-return-narrative-heading" style="white-space:pre-wrap;">@Model.Narrative</div>
+          }
+        </section>
+
+        @await Html.PartialAsync("_ReportMilestonesSection", new ReportMilestonesSectionViewModel
+        {
+            SectionHeading = "Milestones",
+            SectionId = "weekly-return-milestones-heading",
+            IsReadOnly = true,
+            Milestones = reportMilestoneRows
+        })
+
+        </div>
+ </div>
+
+ <div class="govuk-button-group govuk-!-margin-top-6">
+ <a href="@Url.Action("Detail", "ModernWork", new { id = Model.WorkItemId })#wd-weekly-updates" class="govuk-button govuk-button--secondary" data-module="govuk-button">Back to weekly updates</a>
+          @if (ViewBag.CanUnsubmit == true)
+          {
+ <form method="post" action="@Url.Action("WeeklyReportUnsubmit", "ModernWork", new { id = Model.WorkItemId, year = Model.IsoYear, week = Model.IsoWeek })" class="govuk-!-margin-bottom-0">
+              @Html.AntiForgeryToken()
+ <button type="submit" class="govuk-button govuk-button--secondary">Unsubmit to edit</button>
+            </form>
+          }
+        </div>
+
+      </div>
+    </div>
+</div>

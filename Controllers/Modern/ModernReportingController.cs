@@ -232,6 +232,40 @@ public partial class ModernReportingController : Controller
         }
     }
 
+    /// <summary>Priority resourcing report — Perm/MSC FTE from monthly returns by delivery priority and directorate.</summary>
+    [HttpGet("priority-resourcing")]
+    public async Task<IActionResult> PriorityResourcing(
+        int? year,
+        int? month,
+        int? businessAreaId,
+        int? directorateId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var model = await _monthlyReportService.BuildPriorityResourcingReportAsync(
+                year,
+                month,
+                businessAreaId,
+                directorateId,
+                cancellationToken);
+            SetNav("reporting-resourcing");
+            return View("~/Views/Modern/Reporting/PriorityResourcing.cshtml", model);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading priority resourcing report");
+            TempData["ErrorMessage"] = "An error occurred while loading the priority resourcing report. Please try again.";
+            SetNav("reporting-resourcing");
+            return View("~/Views/Modern/Reporting/PriorityResourcing.cshtml", new ModernPriorityResourcingReportViewModel
+            {
+                MinReportYear = 2026,
+                MaxReportYear = Math.Max(2026, DateTime.UtcNow.Year),
+                MonthName = DateTime.UtcNow.ToString("MMMM yyyy")
+            });
+        }
+    }
+
     /// <summary>RAID register coverage — work items and services not in any register scope.</summary>
     [HttpGet("raid-registers")]
     public async Task<IActionResult> RaidRegisters(CancellationToken cancellationToken = default)

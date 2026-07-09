@@ -208,7 +208,7 @@
  {
  <p id="ragJustification-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@Err("ragJustification")</p>
  }
- <textarea class="govuk-textarea @(Err("ragJustification") != null ? "govuk-textarea--error" : "")" id="ragJustification" name="ragJustification" rows="4" maxlength="4000" aria-invalid="@(Err("ragJustification") != null ? "true" : "false")" aria-describedby="@(Err("ragJustification") != null ? "ragJustification-error ragJustification-hint ragJustification-count" : "ragJustification-hint ragJustification-count")" @(isReadOnly ? "disabled" : "")>@Model.RagJustification</textarea>
+ <textarea class="govuk-textarea @(Err("ragJustification") != null ? "govuk-textarea--error" : "")" id="ragJustification" name="ragJustification" rows="10" maxlength="4000" aria-invalid="@(Err("ragJustification") != null ? "true" : "false")" aria-describedby="@(Err("ragJustification") != null ? "ragJustification-error ragJustification-hint ragJustification-count" : "ragJustification-hint ragJustification-count")" @(isReadOnly ? "disabled" : "")>@Model.RagJustification</textarea>
  <div id="ragJustification-count" class="govuk-hint govuk-character-count__message" aria-live="polite">
  <span class="char-current">@(Model.RagJustification?.Length ?? 0)</span> of 4,000 characters
                 </div>
@@ -221,7 +221,7 @@
  {
  <p id="pathToGreen-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@Err("pathToGreen")</p>
  }
- <textarea class="govuk-textarea @(Err("pathToGreen") != null ? "govuk-textarea--error" : "")" id="pathToGreen" name="pathToGreen" rows="4" maxlength="4000" aria-invalid="@(Err("pathToGreen") != null ? "true" : "false")" aria-describedby="@(Err("pathToGreen") != null ? "pathToGreen-error pathToGreen-hint pathToGreen-count" : "pathToGreen-hint pathToGreen-count")" @(isReadOnly ? "disabled" : "")>@Model.PathToGreen</textarea>
+ <textarea class="govuk-textarea @(Err("pathToGreen") != null ? "govuk-textarea--error" : "")" id="pathToGreen" name="pathToGreen" rows="10" maxlength="4000" aria-invalid="@(Err("pathToGreen") != null ? "true" : "false")" aria-describedby="@(Err("pathToGreen") != null ? "pathToGreen-error pathToGreen-hint pathToGreen-count" : "pathToGreen-hint pathToGreen-count")" @(isReadOnly ? "disabled" : "")>@Model.PathToGreen</textarea>
  <div id="pathToGreen-count" class="govuk-hint govuk-character-count__message" aria-live="polite">
  <span class="char-current">@(Model.PathToGreen?.Length ?? 0)</span> of 4,000 characters
                 </div>
@@ -234,11 +234,20 @@
  {
  <p id="narrative-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@Err("narrative")</p>
  }
- <textarea class="govuk-textarea @(Err("narrative") != null ? "govuk-textarea--error" : "")" id="narrative" name="narrative" rows="6" maxlength="4000" aria-invalid="@(Err("narrative") != null ? "true" : "false")" aria-describedby="@(Err("narrative") != null ? "narrative-error narrative-hint narrative-count" : "narrative-hint narrative-count")" @(isReadOnly ? "disabled" : "")>@Model.Narrative</textarea>
+ <textarea class="govuk-textarea @(Err("narrative") != null ? "govuk-textarea--error" : "")" id="narrative" name="narrative" rows="10" maxlength="4000" aria-invalid="@(Err("narrative") != null ? "true" : "false")" aria-describedby="@(Err("narrative") != null ? "narrative-error narrative-hint narrative-count" : "narrative-hint narrative-count")" @(isReadOnly ? "disabled" : "")>@Model.Narrative</textarea>
  <div id="narrative-count" class="govuk-hint govuk-character-count__message" aria-live="polite">
  <span class="char-current">@(Model.Narrative?.Length ?? 0)</span> of 4,000 characters
                 </div>
             </div>
+
+            @await Html.PartialAsync("_ReportMilestonesSection", new ReportMilestonesSectionViewModel
+            {
+                SectionHeading = "Milestones",
+                SectionId = "monthly-report-milestones-heading",
+                IsReadOnly = isReadOnly,
+                Milestones = Model.Milestones,
+                RagStatuses = Model.RagStatuses
+            })
 
             @if (!isReadOnly)
             {

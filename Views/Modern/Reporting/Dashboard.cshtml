@@ -30,6 +30,16 @@
         Description = "Submission progress over the reporting window, with directorate and business area league tables."
       })
       @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingDashboardCard.cshtml", new ReportingDashboardCardViewModel {
+        Title = "Weekly report",
+        Href = Url.Action("WeeklyUpdate", "ModernReporting") ?? "#",
+        Description = "Portfolio RAG, priorities, milestones, and business area roll-up for a weekly reporting period."
+      })
+      @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingDashboardCard.cshtml", new ReportingDashboardCardViewModel {
+        Title = "Weekly submission progress",
+        Href = Url.Action("WeeklySubmissionProgress", "ModernReporting") ?? "#",
+        Description = "Weekly return submission progress over the reporting window, with directorate and business area league tables."
+      })
+      @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingDashboardCard.cshtml", new ReportingDashboardCardViewModel {
         Title = "Priorities report",
         Href = Url.Action("Priorities", "ModernReporting") ?? "#",
         Description = "Monthly metrics by mission pillar, priority outcome, or delivery priority — with drill-down into work items."
@@ -49,6 +59,11 @@
         Title = "Resourcing report",
         Href = Url.Action("Resourcing", "ModernReporting") ?? "#",
         Description = "FTE and MSC totals by directorate, business area, and work item with configurable resource bands and monthly trend."
+      })
+      @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingDashboardCard.cshtml", new ReportingDashboardCardViewModel {
+        Title = "Priority resourcing",
+        Href = Url.Action("PriorityResourcing", "ModernReporting") ?? "#",
+        Description = "Perm and MSC FTE from monthly returns, charted by delivery priority with directorate breakdown and work item drill-down."
       })
     </div>
   </section>

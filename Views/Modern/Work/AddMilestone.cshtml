@@ -1,9 +1,11 @@
 @model Compass.Models.Milestone
+@using Compass.Models
 @using Compass.Models.Modern.Work
 @using System.Linq
 @{
     var work = ViewBag.WorkItem as WorkItem;
     var projectId = Model.ProjectId ?? work?.Id ?? 0;
+    var ragStatuses = ViewBag.MilestoneRagStatuses as List<RagStatus> ?? new List<RagStatus>();
     ViewData["Title"] = "Add milestone";
     bool HasErr(string field) => ViewData.ModelState[field]?.Errors?.Any() == true;
     string? ErrMsg(string field) => ViewData.ModelState[field]?.Errors?.FirstOrDefault()?.ErrorMessage;
@@ -29,7 +31,7 @@
  <div class="dfe-c-form-layout dfe-c-form-layout--full-main">
  <div class="dfe-c-form-layout__main">
  <div class="dfe-c-card dfe-c-card--plain">
-        <form asp-controller="Project" asp-action="AddMilestone" asp-route-projectId="@projectId" method="post" novalidate>
+        <form asp-controller="ModernWork" asp-action="AddMilestonePost" asp-route-id="@projectId" method="post" novalidate>
           @Html.AntiForgeryToken()
 
           @if (!ViewData.ModelState.IsValid)
@@ -115,6 +117,13 @@
                   }
                 </select>
             </div>
+
+            @await Html.PartialAsync("_MilestoneRagField", new MilestoneRagFieldViewModel
+            {
+                FieldName = "ragStatusLookupId",
+                SelectedRagStatusId = Model.RagStatusLookupId,
+                RagStatuses = ragStatuses
+            })
           </fieldset>
 
  <div class="govuk-button-group">

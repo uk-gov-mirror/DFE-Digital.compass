@@ -6,6 +6,8 @@
 @{
     var work = ViewBag.WorkItem as WorkItem;
     var milestoneUpdates = ViewBag.MilestoneUpdates as List<MilestoneUpdate> ?? new List<MilestoneUpdate>();
+    var ragStatuses = ViewBag.MilestoneRagStatuses as List<RagStatus> ?? new List<RagStatus>();
+    var currentRagName = Model.RagStatusLookup?.Name;
     ViewData["Title"] = "Edit milestone";
     bool HasErr(string field) => ViewData.ModelState[field]?.Errors?.Any() == true;
     string? ErrMsg(string field) => ViewData.ModelState[field]?.Errors?.FirstOrDefault()?.ErrorMessage;
@@ -117,6 +119,13 @@
                   }
                 </select>
             </div>
+
+            @await Html.PartialAsync("_MilestoneRagField", new MilestoneRagFieldViewModel
+            {
+                FieldName = "ragStatusLookupId",
+                SelectedRagStatusId = Model.RagStatusLookupId,
+                RagStatuses = ragStatuses
+            })
           </fieldset>
 
  <div class="govuk-button-group">
@@ -161,6 +170,10 @@
                   @if (!string.IsNullOrWhiteSpace(update.NewStatus) && !string.Equals(update.NewStatus, update.PreviousStatus, StringComparison.OrdinalIgnoreCase))
                   {
                     <text> · Status: @StatusLabel(update.PreviousStatus) → @StatusLabel(update.NewStatus)</text>
+                  }
+                  @if (update.NewRagStatusLookupId != update.PreviousRagStatusLookupId)
+                  {
+                    <text> · RAG updated</text>
                   }
                   @if (update.NewProgress.HasValue && update.NewProgress != update.PreviousProgress)
                   {

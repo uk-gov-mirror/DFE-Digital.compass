@@ -390,6 +390,7 @@
                 <tr class="govuk-table__row">
                   <th scope="col" class="govuk-table__header">Milestone</th>
                   <th scope="col" class="govuk-table__header">Status</th>
+                  <th scope="col" class="govuk-table__header">RAG</th>
                   <th scope="col" class="govuk-table__header">Due date</th>
                 </tr>
               </thead>
@@ -399,12 +400,23 @@
                   var m = item.m;
                   var progressName = item.progressName;
                   var badgeClass = WorkBadgeCss.MilestoneProgressDfeFrontendBadgeClass(progressName);
+                  var ragName = m.RagStatusLookup?.Name;
                   var milestoneEditHref = Url.Content($"~/modern/work/{Model.Id}/milestone/{m.Id}/edit");
  <tr class="@(item.isOverdue ? "govuk-table__row work-milestones-table__row--overdue" : "govuk-table__row")">
                     <td class="govuk-table__cell">
  <a href="@milestoneEditHref" class="govuk-link govuk-link--no-visited-state govuk-!-font-weight-bold">@m.Name</a>
                     </td>
  <td class="govuk-table__cell"><span class="@badgeClass dfe-f-badge--small" style="white-space:nowrap;">@progressName</span></td>
+                    <td class="govuk-table__cell">
+                      @if (string.IsNullOrWhiteSpace(ragName))
+                      {
+                        <span>—</span>
+                      }
+                      else
+                      {
+                        <span class="@WorkBadgeCss.RagCompactBadgeClass(ragName)">@ragName.ToUpperInvariant()</span>
+                      }
+                    </td>
                     <td class="govuk-table__cell govuk-!-font-weight-regular" style="white-space:nowrap;">@if (item.isOverdue) {<span class="work-milestones-table__due--overdue">@m.DueDate.ToString("d MMM yyyy")</span>} else {@m.DueDate.ToString("d MMM yyyy")}</td>
                   </tr>
                 }
@@ -439,6 +451,7 @@
                 <tr class="govuk-table__row">
                   <th scope="col" class="govuk-table__header">Milestone</th>
                   <th scope="col" class="govuk-table__header">Status</th>
+                  <th scope="col" class="govuk-table__header">RAG</th>
                   <th scope="col" class="govuk-table__header">Due date</th>
                 </tr>
               </thead>
@@ -448,12 +461,23 @@
                   var m = item.m;
                   var progressName = item.progressName;
                   var badgeClass = WorkBadgeCss.MilestoneProgressDfeFrontendBadgeClass(progressName);
+                  var ragName = m.RagStatusLookup?.Name;
                   var milestoneEditHref = Url.Content($"~/modern/work/{Model.Id}/milestone/{m.Id}/edit");
                   <tr class="govuk-table__row">
                     <td class="govuk-table__cell">
  <a href="@milestoneEditHref" class="govuk-link govuk-link--no-visited-state govuk-!-font-weight-bold">@m.Name</a>
                     </td>
  <td class="govuk-table__cell"><span class="@badgeClass dfe-f-badge--small" style="white-space:nowrap;">@progressName</span></td>
+                    <td class="govuk-table__cell">
+                      @if (string.IsNullOrWhiteSpace(ragName))
+                      {
+                        <span>—</span>
+                      }
+                      else
+                      {
+                        <span class="@WorkBadgeCss.RagCompactBadgeClass(ragName)">@ragName.ToUpperInvariant()</span>
+                      }
+                    </td>
                     <td class="govuk-table__cell govuk-!-font-weight-regular" style="white-space:nowrap;">@m.DueDate.ToString("d MMM yyyy")</td>
                   </tr>
                 }
@@ -487,6 +511,10 @@
   </div>
 
   <!-- UPDATES TAB -->
+  @if (ViewBag.ShowWeeklyReporting as bool? == true)
+  {
+    @await Html.PartialAsync("_WorkItemWeeklyUpdatesTab", Model)
+  }
   @{
     var updatesList = Model.MonthlyUpdates?.OrderByDescending(m => m.ReportMonth).ToList() ?? new List<MonthlyUpdate>();
     var periodDueByKey = ViewBag.ReportingPeriodDueByKey as Dictionary<string, (DateTime DueDate, string Label)> ?? new Dictionary<string, (DateTime, string)>();

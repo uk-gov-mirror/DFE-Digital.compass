@@ -8787,6 +8787,9 @@ namespace Compass.Migrations
                     b.Property<int?>("ProjectId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("RagStatusLookupId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(450)
@@ -8808,6 +8811,8 @@ namespace Compass.Migrations
                     b.HasIndex("ProductDocumentId");
 
                     b.HasIndex("ProjectId");
+
+                    b.HasIndex("RagStatusLookupId");
 
                     b.HasIndex("Status");
 
@@ -8873,11 +8878,17 @@ namespace Compass.Migrations
                     b.Property<int?>("NewProgress")
                         .HasColumnType("int");
 
+                    b.Property<int?>("NewRagStatusLookupId")
+                        .HasColumnType("int");
+
                     b.Property<string>("NewStatus")
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<int?>("PreviousProgress")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PreviousRagStatusLookupId")
                         .HasColumnType("int");
 
                     b.Property<string>("PreviousStatus")
@@ -11863,6 +11874,96 @@ namespace Compass.Migrations
                     b.HasIndex("UpdatedByUserId");
 
                     b.ToTable("ProjectWeeklySuccessUpdates");
+                });
+
+            modelBuilder.Entity("Compass.Models.ProjectWeeklyWorkUpdate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByEmail")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("CreatedByEntraId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("CreatedByName")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DraftPathToGreen")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("DraftRagJustification")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<int?>("DraftRagStatusLookupId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IsoWeek")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IsoYear")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Narrative")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("PeopleNarrative")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("WeekEndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("WeekStartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("WeeklyMspFte")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("WeeklyPermFte")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("DraftRagStatusLookupId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.HasIndex("ProjectId", "IsoYear", "IsoWeek")
+                        .IsUnique();
+
+                    b.ToTable("ProjectWeeklyWorkUpdates");
                 });
 
             modelBuilder.Entity("Compass.Models.ProjectWorkItemTag", b =>
@@ -15045,6 +15146,79 @@ namespace Compass.Migrations
                     b.ToTable("WcagCriteria");
                 });
 
+            modelBuilder.Entity("Compass.Models.WeeklyWorkReportingConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DueDayOfWeek")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DueWeekOffset")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("FirstReportingPeriodStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PeriodEndDayOfWeek")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PeriodStartDayOfWeek")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WeeklyWorkReportingConfigs");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            DueDayOfWeek = 5,
+                            DueWeekOffset = 0,
+                            FirstReportingPeriodStart = new DateTime(2026, 6, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            PeriodEndDayOfWeek = 5,
+                            PeriodStartDayOfWeek = 1,
+                            UpdatedAt = new DateTime(2026, 7, 2, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
+            modelBuilder.Entity("Compass.Models.WeeklyWorkReportingScopeProject", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("AddedByEmail")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId")
+                        .IsUnique();
+
+                    b.ToTable("WeeklyWorkReportingScopeProjects");
+                });
+
             modelBuilder.Entity("Compass.Models.WorkItemTagLookup", b =>
                 {
                     b.Property<int>("Id")
@@ -15173,6 +15347,51 @@ namespace Compass.Migrations
                         .IsUnique();
 
                     b.ToTable("ReportingCyclePeriods", (string)null);
+                });
+
+            modelBuilder.Entity("Compass.Models.WorkUpdateMilestoneEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("MilestoneId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ProjectMonthlyUpdateId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ProjectWeeklyWorkUpdateId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("RagStatusLookupId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("UpdateNote")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MilestoneId");
+
+                    b.HasIndex("ProjectMonthlyUpdateId");
+
+                    b.HasIndex("ProjectWeeklyWorkUpdateId");
+
+                    b.HasIndex("RagStatusLookupId");
+
+                    b.ToTable("WorkUpdateMilestoneEntries");
                 });
 
             modelBuilder.Entity("Compass.Models.AccessibilityIssue", b =>
@@ -17302,11 +17521,18 @@ namespace Compass.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Compass.Models.RagStatusLookup", "RagStatusLookup")
+                        .WithMany()
+                        .HasForeignKey("RagStatusLookupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Objective");
 
                     b.Navigation("OwnerUser");
 
                     b.Navigation("Project");
+
+                    b.Navigation("RagStatusLookup");
                 });
 
             modelBuilder.Entity("Compass.Models.MilestoneAction", b =>
@@ -18111,6 +18337,35 @@ namespace Compass.Migrations
                         .HasForeignKey("UpdatedByUserId");
 
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("UpdatedByUser");
+                });
+
+            modelBuilder.Entity("Compass.Models.ProjectWeeklyWorkUpdate", b =>
+                {
+                    b.HasOne("Compass.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Compass.Models.RagStatusLookup", "DraftRagStatusLookup")
+                        .WithMany()
+                        .HasForeignKey("DraftRagStatusLookupId");
+
+                    b.HasOne("Compass.Models.Project", "Project")
+                        .WithMany("WeeklyWorkUpdates")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Compass.Models.User", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("DraftRagStatusLookup");
 
                     b.Navigation("Project");
 
@@ -19306,6 +19561,17 @@ namespace Compass.Migrations
                     b.Navigation("UserProfessionalProfile");
                 });
 
+            modelBuilder.Entity("Compass.Models.WeeklyWorkReportingScopeProject", b =>
+                {
+                    b.HasOne("Compass.Models.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+                });
+
             modelBuilder.Entity("Compass.Models.WorkReportingCyclePeriod", b =>
                 {
                     b.HasOne("Compass.Models.WorkReportingCycle", "ReportingCycle")
@@ -19315,6 +19581,38 @@ namespace Compass.Migrations
                         .IsRequired();
 
                     b.Navigation("ReportingCycle");
+                });
+
+            modelBuilder.Entity("Compass.Models.WorkUpdateMilestoneEntry", b =>
+                {
+                    b.HasOne("Compass.Models.Milestone", "Milestone")
+                        .WithMany()
+                        .HasForeignKey("MilestoneId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Compass.Models.ProjectMonthlyUpdate", "ProjectMonthlyUpdate")
+                        .WithMany()
+                        .HasForeignKey("ProjectMonthlyUpdateId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Compass.Models.ProjectWeeklyWorkUpdate", "ProjectWeeklyWorkUpdate")
+                        .WithMany()
+                        .HasForeignKey("ProjectWeeklyWorkUpdateId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Compass.Models.RagStatusLookup", "RagStatusLookup")
+                        .WithMany()
+                        .HasForeignKey("RagStatusLookupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Milestone");
+
+                    b.Navigation("ProjectMonthlyUpdate");
+
+                    b.Navigation("ProjectWeeklyWorkUpdate");
+
+                    b.Navigation("RagStatusLookup");
                 });
 
             modelBuilder.Entity("Compass.Models.AccessibilityIssue", b =>
@@ -19784,6 +20082,8 @@ namespace Compass.Migrations
                     b.Navigation("Successes");
 
                     b.Navigation("WeeklySuccessUpdates");
+
+                    b.Navigation("WeeklyWorkUpdates");
                 });
 
             modelBuilder.Entity("Compass.Models.ProjectMonthlyUpdate", b =>

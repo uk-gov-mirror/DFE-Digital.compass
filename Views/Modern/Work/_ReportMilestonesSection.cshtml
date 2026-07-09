@@ -1,0 +1,144 @@
+@model Compass.Models.Modern.Work.ReportMilestonesSectionViewModel
+@using Compass.Models.Modern.Work
+@using System.Globalization
+@{
+    var statusOpts = new (string Value, string Label)[]
+    {
+        ("not_started", "Not started"),
+        ("in_progress", "In progress"),
+        ("on_track", "On track"),
+        ("at_risk", "At risk"),
+        ("delayed", "Delayed"),
+        ("complete", "Complete"),
+        ("cancelled", "Cancelled")
+    };
+    string StatusLabel(string? value) =>
+        statusOpts.FirstOrDefault(o => string.Equals(o.Value, value, StringComparison.OrdinalIgnoreCase)).Label ?? value ?? "—";
+    var ms = ViewData.ModelState;
+    string? Err(string key) =>
+        ms.TryGetValue(key, out var st) && st!.Errors.Count > 0 ? st.Errors[0].ErrorMessage : null;
+}
+
+@if (Model.Milestones.Count == 0)
+{
+    <section class="monthly-return-section" aria-labelledby="@Model.SectionId">
+        <h3 class="govuk-heading-m govuk-!-margin-top-6" id="@Model.SectionId">@Model.SectionHeading</h3>
+        <p class="govuk-body govuk-hint govuk-!-margin-bottom-0">No in-progress milestones to update for this work item.</p>
+    </section>
+}
+else if (Model.IsReadOnly)
+{
+    <section class="monthly-return-section" aria-labelledby="@Model.SectionId">
+        <h3 class="govuk-heading-m govuk-!-margin-top-6" id="@Model.SectionId">@Model.SectionHeading</h3>
+        <p class="govuk-body govuk-hint">Milestone status and RAG recorded with this update.</p>
+        <div class="dfe-f-table-wrapper govuk-!-margin-top-4" data-module="dfe-f-table">
+            <table class="govuk-table govuk-table--small-text-until-tablet dfe-f-table--condensed govuk-!-margin-bottom-0">
+                <caption class="govuk-table__caption govuk-table__caption--m govuk-visually-hidden">Milestones reported</caption>
+                <thead class="govuk-table__head">
+                    <tr class="govuk-table__row">
+                        <th scope="col" class="govuk-table__header">Milestone</th>
+                        <th scope="col" class="govuk-table__header">Status</th>
+                        <th scope="col" class="govuk-table__header">RAG</th>
+                        <th scope="col" class="govuk-table__header">Due date</th>
+                        <th scope="col" class="govuk-table__header">Update</th>
+                    </tr>
+                </thead>
+                <tbody class="govuk-table__body">
+                    @foreach (var row in Model.Milestones)
+                    {
+                        <tr class="govuk-table__row">
+                            <td class="govuk-table__cell govuk-!-font-weight-bold">@row.Name</td>
+                            <td class="govuk-table__cell">
+                                <span class="@WorkBadgeCss.MilestoneProgressDfeFrontendBadgeClass(StatusLabel(row.Status)) dfe-f-badge--small">@StatusLabel(row.Status)</span>
+                            </td>
+                            <td class="govuk-table__cell">
+                                @if (string.IsNullOrWhiteSpace(row.RagName))
+                                {
+                                    <span>—</span>
+                                }
+                                else
+                                {
+                                    <span class="@WorkBadgeCss.RagCompactBadgeClass(row.RagName)">@row.RagName.ToUpperInvariant()</span>
+                                }
+                            </td>
+                            <td class="govuk-table__cell">@row.DueDate.ToString("d MMM yyyy", CultureInfo.GetCultureInfo("en-GB"))</td>
+                            <td class="govuk-table__cell">@(string.IsNullOrWhiteSpace(row.UpdateNote) ? "—" : row.UpdateNote)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+else
+{
+    <section class="monthly-return-section" aria-labelledby="@Model.SectionId">
+        <h3 class="govuk-heading-m govuk-!-margin-top-6" id="@Model.SectionId">@Model.SectionHeading</h3>
+        <p class="govuk-body govuk-hint">Update status and RAG for each in-progress milestone. Add a short note when something has changed.</p>
+
+        @foreach (var row in Model.Milestones)
+        {
+            var statusField = $"milestoneStatus[{row.MilestoneId}]";
+            var ragField = $"milestoneRagStatusId[{row.MilestoneId}]";
+            var noteField = $"milestoneUpdateNote[{row.MilestoneId}]";
+            var statusErr = Err(statusField);
+            var ragErr = Err(ragField);
+            <div class="govuk-!-margin-top-6 govuk-!-padding-4" style="border:1px solid #b1b4b6;">
+                <h4 class="govuk-heading-s govuk-!-margin-top-0">@row.Name</h4>
+                <p class="govuk-body-s govuk-hint govuk-!-margin-bottom-4">Due @row.DueDate.ToString("d MMMM yyyy", CultureInfo.GetCultureInfo("en-GB"))</p>
+
+                <div class="govuk-grid-row">
+                    <div class="govuk-grid-column-one-half">
+                        <div class="govuk-form-group @(statusErr != null ? "govuk-form-group--error" : "")">
+                            <label class="govuk-label" for="milestone-status-@row.MilestoneId">Status</label>
+                            @if (statusErr != null)
+                            {
+                                <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@statusErr</p>
+                            }
+                            <select class="govuk-select @(statusErr != null ? "govuk-select--error" : "")" id="milestone-status-@row.MilestoneId" name="@statusField">
+                                @foreach (var o in statusOpts)
+                                {
+                                    if (string.Equals(row.Status, o.Value, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <option value="@o.Value" selected>@o.Label</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@o.Value">@o.Label</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="govuk-grid-column-one-half">
+                        <div class="govuk-form-group @(ragErr != null ? "govuk-form-group--error" : "")">
+                            <fieldset class="govuk-fieldset">
+                                <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">RAG</legend>
+                                @if (ragErr != null)
+                                {
+                                    <p class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span>@ragErr</p>
+                                }
+                                <div class="govuk-radios govuk-radios--small" data-module="govuk-radios">
+                                    @foreach (var rag in Model.RagStatuses)
+                                    {
+                                        var inputId = $"milestone-rag-{row.MilestoneId}-{rag.Id}";
+                                        <div class="govuk-radios__item">
+                                            <input class="govuk-radios__input" id="@inputId" name="@ragField" type="radio" value="@rag.Id" @(row.RagStatusId == rag.Id ? "checked" : "") />
+                                            <label class="govuk-label govuk-radios__label" for="@inputId">@rag.Name</label>
+                                        </div>
+                                    }
+                                </div>
+                            </fieldset>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="govuk-form-group govuk-!-margin-bottom-0">
+                    <label class="govuk-label" for="milestone-note-@row.MilestoneId">Update note (optional)</label>
+                    <div class="govuk-hint">Describe progress, blockers, or changes since the last update.</div>
+                    <textarea class="govuk-textarea" id="milestone-note-@row.MilestoneId" name="@noteField" rows="3" maxlength="4000">@row.UpdateNote</textarea>
+                </div>
+            </div>
+        }
+    </section>
+}
