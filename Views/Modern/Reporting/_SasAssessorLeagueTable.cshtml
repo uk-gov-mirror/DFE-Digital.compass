@@ -1,6 +1,39 @@
 @model IReadOnlyList<Compass.ViewModels.Modern.SasAssessorLeagueRowVm>
 @{
     var rows = Model ?? Array.Empty<Compass.ViewModels.Modern.SasAssessorLeagueRowVm>();
+    var yearKey = ViewData["SasLeagueYearKey"] as string ?? "all";
+    var reportBaseUrl = (ViewData["SasReportBaseUrl"] as string ?? "https://service-assessments.education.gov.uk/reports/report").TrimEnd('/');
+    var ci = System.Globalization.CultureInfo.GetCultureInfo("en-GB");
+
+    string OutcomeBadge(string? o) => o switch
+    {
+        "Green" => "dfe-f-badge--green",
+        "Amber" => "dfe-f-badge--orange",
+        "Red" => "dfe-f-badge--red",
+        _ => "dfe-f-badge--grey"
+    };
+
+    string DrillId(int assessorId) => $"sas-league-detail-{yearKey}-{assessorId}";
+
+    void RenderDrillButton(int count, string filter, string label, int assessorId)
+    {
+        if (count > 0)
+        {
+            <button type="button"
+                    class="mr-ba-num sas-league-drill"
+                    data-sas-league-filter="@filter"
+                    data-expand-id="@DrillId(assessorId)"
+                    aria-expanded="false"
+                    aria-controls="@DrillId(assessorId)"
+                    aria-label="@label (@count)">
+                @count.ToString("N0")
+            </button>
+        }
+        else
+        {
+            <span class="mr-ba-num mr-ba-num--muted">0</span>
+        }
+    }
 }
 @if (rows.Count == 0)
 {
@@ -10,7 +43,7 @@ else
 {
     <div class="dfe-f-table-wrapper govuk-!-margin-bottom-0" data-module="dfe-f-table">
         <div class="govuk-visually-hidden" aria-live="polite" data-dfe-table-sort-live></div>
-        <table class="govuk-table mr-ba-table">
+        <table class="govuk-table mr-ba-table sas-league-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
                     <th scope="col" class="govuk-table__header mr-ba-table__num-hdr" aria-sort="none">
@@ -48,7 +81,9 @@ else
             <tbody class="govuk-table__body">
                 @foreach (var row in rows)
                 {
-                    <tr class="govuk-table__row">
+                    var detailId = DrillId(row.AssessorId);
+                    var hasAssignments = row.Assignments.Count > 0;
+                    <tr class="govuk-table__row" data-sas-league-row="@row.AssessorId">
                         <td class="mr-ba-table__num"><span class="mr-ba-num">@row.Rank</span></td>
                         <th scope="row">
                             @row.DisplayName
@@ -58,17 +93,85 @@ else
                             }
                         </th>
                         <td>@row.PrimaryRole</td>
-                        <td class="mr-ba-table__num"><span class="mr-ba-num">@row.ServiceAssessmentCount.ToString("N0")</span></td>
-                        <td class="mr-ba-table__num"><span class="mr-ba-num">@row.PeerReviewCount.ToString("N0")</span></td>
-                        <td class="mr-ba-table__num"><span class="mr-ba-num">@row.PanelCount.ToString("N0")</span></td>
-                        <td class="mr-ba-table__num"><span class="mr-ba-num">@row.PublishedCount.ToString("N0")</span></td>
-                        <td class="mr-ba-table__num"><span class="mr-ba-num">@row.Red.ToString("N0")</span></td>
-                        <td class="mr-ba-table__num"><span class="mr-ba-num">@row.Amber.ToString("N0")</span></td>
-                        <td class="mr-ba-table__num"><span class="mr-ba-num">@row.Green.ToString("N0")</span></td>
+                        <td class="mr-ba-table__num">
+                            @{ RenderDrillButton(row.ServiceAssessmentCount, "assessments", "Service assessments for " + row.DisplayName, row.AssessorId); }
+                        </td>
+                        <td class="mr-ba-table__num">
+                            @{ RenderDrillButton(row.PeerReviewCount, "peer-reviews", "Peer reviews for " + row.DisplayName, row.AssessorId); }
+                        </td>
+                        <td class="mr-ba-table__num">
+                            @{ RenderDrillButton(row.PanelCount, "panels", "Panel assignments for " + row.DisplayName, row.AssessorId); }
+                        </td>
+                        <td class="mr-ba-table__num">
+                            @{ RenderDrillButton(row.PublishedCount, "published", "Published panel assignments for " + row.DisplayName, row.AssessorId); }
+                        </td>
+                        <td class="mr-ba-table__num">
+                            @{ RenderDrillButton(row.Red, "red", "Red outcomes for " + row.DisplayName, row.AssessorId); }
+                        </td>
+                        <td class="mr-ba-table__num">
+                            @{ RenderDrillButton(row.Amber, "amber", "Amber outcomes for " + row.DisplayName, row.AssessorId); }
+                        </td>
+                        <td class="mr-ba-table__num">
+                            @{ RenderDrillButton(row.Green, "green", "Green outcomes for " + row.DisplayName, row.AssessorId); }
+                        </td>
                     </tr>
+                    @if (hasAssignments)
+                    {
+                        <tr class="sas-league-detail" id="@detailId" hidden>
+                            <td colspan="10" class="govuk-table__cell sas-league-detail__cell">
+                                <p class="govuk-body-s dfe-c-text-muted govuk-!-margin-top-0 govuk-!-margin-bottom-2 sas-league-detail__label">
+                                    Panel assignments for <strong>@row.DisplayName</strong>
+                                </p>
+                                <div class="dfe-f-table-wrapper" data-module="dfe-f-table">
+                                    <table class="govuk-table govuk-table--small-text-until-tablet dfe-f-table--condensed govuk-!-margin-bottom-0 sas-league-detail__table">
+                                        <caption class="govuk-visually-hidden">Panel assignments for @row.DisplayName</caption>
+                                        <thead class="govuk-table__head">
+                                            <tr class="govuk-table__row">
+                                                <th scope="col" class="govuk-table__header">Assessment</th>
+                                                <th scope="col" class="govuk-table__header">Type</th>
+                                                <th scope="col" class="govuk-table__header">Panel role</th>
+                                                <th scope="col" class="govuk-table__header">Phase</th>
+                                                <th scope="col" class="govuk-table__header">Date</th>
+                                                <th scope="col" class="govuk-table__header">Status</th>
+                                                <th scope="col" class="govuk-table__header">Outcome</th>
+                                                <th scope="col" class="govuk-table__header">Report</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="govuk-table__body">
+                                            @foreach (var assignment in row.Assignments)
+                                            {
+                                                var typeKey = assignment.Type.ToLowerInvariant();
+                                                var statusKey = assignment.Status.ToLowerInvariant();
+                                                var outcomeKey = assignment.Outcome.ToLowerInvariant();
+                                                var reportUrl = $"{reportBaseUrl}/{assignment.AssessmentId}";
+                                                <tr class="govuk-table__row sas-league-detail__item"
+                                                    data-sas-type="@typeKey"
+                                                    data-sas-status="@statusKey"
+                                                    data-sas-outcome="@outcomeKey">
+                                                    <th scope="row" class="govuk-table__cell">@(!string.IsNullOrWhiteSpace(assignment.Name) ? assignment.Name : "—")</th>
+                                                    <td class="govuk-table__cell">@assignment.Type</td>
+                                                    <td class="govuk-table__cell">@assignment.PanelRole</td>
+                                                    <td class="govuk-table__cell">@assignment.Phase</td>
+                                                    <td class="govuk-table__cell">
+                                                        @(assignment.AssessmentDateTime is { } d ? d.ToString("d MMM yyyy", ci) : "—")
+                                                    </td>
+                                                    <td class="govuk-table__cell">@assignment.Status</td>
+                                                    <td class="govuk-table__cell">
+                                                        <span class="dfe-f-badge dfe-f-badge--small @OutcomeBadge(assignment.Outcome)">@assignment.Outcome</span>
+                                                    </td>
+                                                    <td class="govuk-table__cell">
+                                                        <a class="govuk-link govuk-link--no-visited-state" href="@reportUrl" rel="noopener noreferrer" target="_blank">View</a>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+                    }
                 }
             </tbody>
         </table>
     </div>
 }
-
