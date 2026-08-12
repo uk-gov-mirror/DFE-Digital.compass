@@ -3,6 +3,7 @@
 @{
   ViewData["Title"] = "Action request — " + Model.Reference;
   var tierRequestsListUrl = Url.Action("RaidEscalations", "ModernOperations", new { tab = Model.ListReturnTab }) ?? "#";
+  var requestKind = Model.IsEscalation ? "Escalation" : "De-escalation";
 }
 @section Breadcrumbs {
   <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Index", "ModernDashboard")">Home</a></li>
@@ -32,7 +33,7 @@
   }
   @await Html.PartialAsync("_ModernPageHeader", new ModernPageHeaderViewModel {
     Caption = "Operations · RAID",
-    Title = "Escalation request",
+    Title = requestKind + " request",
     Lede = raidEscRevLede,
     Actions = raidEscRevActions
   })

@@ -2,6 +2,7 @@
 @{
   var emptyMsg = ViewBag.RaidEscQueueEmpty as string ?? "Nothing in this queue.";
   var returnTab = ViewBag.RaidEscReturnTab as string ?? "escalations";
+  var canActionTierChanges = ViewBag.CanActionTierChanges as bool? == true;
 }
 @if (Model == null || Model.Count == 0)
 {
@@ -11,6 +12,7 @@
 }
 else
 {
+  <div class="modern-operations-raid-escalations__table-scroll">
   <div class="dfe-f-table-wrapper" data-module="dfe-f-table">
     <div class="govuk-visually-hidden" aria-live="polite" data-dfe-table-sort-live></div>
     <table id="raid-ops-escalations-pending" aria-label="Pending tier change requests" class="govuk-table govuk-!-margin-bottom-0">
@@ -20,7 +22,7 @@ else
             <button type="button" class="dfe-f-table-sort-button">Risk</button>
           </th>
           <th scope="col" class="govuk-table__header" aria-sort="none">
-            <button type="button" class="dfe-f-table-sort-button">Current (proposed)</button>
+            <button type="button" class="dfe-f-table-sort-button">From tier</button>
           </th>
           <th scope="col" class="govuk-table__header" aria-sort="none">
             <button type="button" class="dfe-f-table-sort-button">Requested to</button>
@@ -41,23 +43,24 @@ else
         @foreach (var row in Model)
         {
           var viewInRaidUrl = Url.Action("RiskDetail", "ModernRaid", new { id = row.RecordId });
+          var actionUrl = canActionTierChanges
+            ? (row.RequestId is { } requestId
+              ? Url.Action("RaidEscalationAction", "ModernOperations", new { requestId, returnTab })
+              : Url.Action("RaidEscalationActionForRisk", "ModernOperations", new { riskId = row.RecordId, returnTab }))
+            : null;
           <tr class="govuk-table__row">
             <td class="govuk-table__cell">
-              @if (row.RequestId is { } titleRequestId)
+              @if (!string.IsNullOrEmpty(actionUrl))
               {
-                var actionUrl = Url.Action("RaidEscalationAction", "ModernOperations", new { requestId = titleRequestId, returnTab = returnTab });
                 <a class="govuk-link govuk-!-font-weight-bold govuk-link--no-visited-state" href="@actionUrl" title="Open the Operations view to approve or reject this tier request">@(!string.IsNullOrWhiteSpace(row.Title) ? row.Title : row.Reference)</a>
-                <div class="dfe-c-mono govuk-body-s dfe-c-text-muted">@row.Reference
-                  <span class="govuk-!-margin-left-1">· <a class="govuk-link govuk-link--no-visited-state" href="@viewInRaidUrl" rel="noopener noreferrer" target="_blank" title="Open the risk in RAID (read-only)">View in RAID</a></span>
-                </div>
               }
               else
               {
-                <a class="govuk-link govuk-!-font-weight-bold govuk-link--no-visited-state" href="@viewInRaidUrl" title="View risk in RAID — no pending request record in Operations; fix data or submit a new tier change from RAID">@(!string.IsNullOrWhiteSpace(row.Title) ? row.Title : row.Reference)</a>
-                <div class="dfe-c-mono govuk-body-s dfe-c-text-muted">@row.Reference
-                  <span class="govuk-!-margin-left-1 dfe-c-text-muted">· <span class="govuk-!-font-size-16">No pending request id</span></span>
-                </div>
+                @(!string.IsNullOrWhiteSpace(row.Title) ? row.Title : row.Reference)
               }
+              <div class="dfe-c-mono govuk-body-s dfe-c-text-muted">@row.Reference
+                <span class="govuk-!-margin-left-1">· <a class="govuk-link govuk-link--no-visited-state" href="@viewInRaidUrl" rel="noopener noreferrer" target="_blank" title="Open the risk in RAID (read-only)">View in RAID</a></span>
+              </div>
             </td>
             <td class="govuk-table__cell">@row.CurrentTierLabel</td>
             <td class="govuk-table__cell">@row.ProposedTierLabel</td>
@@ -66,19 +69,16 @@ else
             <td class="govuk-table__cell" style="max-width:20rem; word-wrap:break-word;">
               <span title="@row.FullReason">@(string.IsNullOrWhiteSpace(row.ReasonSnippet) ? "—" : row.ReasonSnippet)</span>
             </td>
-            <td class="govuk-table__cell">
-              @if (row.RequestId is { } qid)
+            <td class="govuk-table__cell modern-operations-raid-escalations__actions-cell">
+              @if (!string.IsNullOrEmpty(actionUrl))
               {
-                <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" href="@Url.Action("RaidEscalationAction", "ModernOperations", new { requestId = qid, returnTab = returnTab })">Action request</a>
-              }
-              else
-              {
-                <span class="govuk-body-s dfe-c-text-muted" title="The risk is in a proposed tier but there is no pending tier-change request in the database.">—</span>
+                <a class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" href="@actionUrl">Action request</a>
               }
             </td>
           </tr>
         }
       </tbody>
     </table>
+  </div>
   </div>
 }

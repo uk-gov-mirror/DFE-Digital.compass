@@ -222,6 +222,12 @@ public sealed class SubNavExportResolver
             return Options(current, workAll);
         }
 
+        if (string.Equals(action, "RisksByTier", StringComparison.OrdinalIgnoreCase))
+        {
+            var risksAll = c.Url.Action("ExportRisksExcel", "ModernRaid");
+            return Options(null, risksAll);
+        }
+
         return action switch
         {
             "Dashboard" or "MonthlyUpdate" or "Performance" or "Assessments" or "Accessibility" or "RaidReviewProgress"

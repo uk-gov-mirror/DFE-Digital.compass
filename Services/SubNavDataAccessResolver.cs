@@ -414,6 +414,15 @@ public sealed class SubNavDataAccessResolver
                 });
         }
 
+        if (string.Equals(action, "RisksByTier", StringComparison.OrdinalIgnoreCase))
+        {
+            var risksAll = c.Url.Action("ExportRisksExcel", "ModernRaid");
+            var links = new List<SubNavExportLink>();
+            if (risksAll != null)
+                links.Add(Link("All risk data (Excel)", risksAll, "Every risk in the register."));
+            return links.Count == 0 ? null : Panel("Report exports", links);
+        }
+
         if (action is "Dashboard" or "MonthlyUpdate" or "MonthlySubmissionProgress")
         {
             var links = new List<SubNavExportLink>();

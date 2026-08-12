@@ -19,11 +19,28 @@ public partial class ModernRaidController
             $"raid-register-full-{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx");
     }
 
-    private async Task<byte[]> BuildRaidRegisterExcelWorkbookAsync(CancellationToken cancellationToken)
+    [HttpGet("export/risks.xlsx")]
+    public async Task<IActionResult> ExportRisksExcel(CancellationToken cancellationToken = default)
     {
-        static string? UserDisp(User? u) => u == null ? null : (u.Name ?? u.Email);
+        var bytes = await BuildRisksExcelWorkbookAsync(cancellationToken);
+        return File(
+            bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"risks-register-{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx");
+    }
 
-        var risks = await _db.Risks.AsNoTracking()
+    private async Task<byte[]> BuildRisksExcelWorkbookAsync(CancellationToken cancellationToken)
+    {
+        var risks = await LoadRisksForExcelExportAsync(cancellationToken);
+        using var wb = new XLWorkbook();
+        WriteRisksExcelWorksheet(wb.Worksheets.Add("Risks"), risks);
+        await using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        return ms.ToArray();
+    }
+
+    private async Task<List<Risk>> LoadRisksForExcelExportAsync(CancellationToken cancellationToken) =>
+        await _db.Risks.AsNoTracking()
             .Where(r => !r.IsDeleted)
             .Include(r => r.Project)
             .Include(r => r.PrimaryProduct)
@@ -50,6 +67,12 @@ public partial class ModernRaidController
             .OrderBy(r => r.Id)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
+
+    private async Task<byte[]> BuildRaidRegisterExcelWorkbookAsync(CancellationToken cancellationToken)
+    {
+        static string? UserDisp(User? u) => u == null ? null : (u.Name ?? u.Email);
+
+        var risks = await LoadRisksForExcelExportAsync(cancellationToken);
 
         var issues = await _db.Issues.AsNoTracking()
             .Where(i => !i.IsDeleted)
@@ -111,104 +134,7 @@ public partial class ModernRaidController
 
         var ci = CultureInfo.InvariantCulture;
 
-        // --- Risks ---
-        var wsR = wb.Worksheets.Add("Risks");
-        var riskHeaders = new[]
-        {
-            "Id", "Reference", "Title", "Description", "Notes", "LegacyCategory", "LegacyBusinessArea", "LegacyStatus",
-            "Status (lookup)", "Tier", "Priority", "Likelihood (lookup)", "Impact level (lookup)", "Proximity (lookup)",
-            "Primary category (lookup)", "ImpactRating", "LikelihoodRating", "RiskScore", "InherentScore", "ResidualScore",
-            "ResidualImpact", "ResidualLikelihood", "Response (legacy)", "ResponseStrategy", "ProximityDate",
-            "IdentifiedDate", "NextReviewDate", "LastReviewDate", "ClosedDate", "TargetDate", "OwnerEmail",
-            "Owner", "SRO", "ProjectId", "Work item", "PrimaryProductId", "Primary product", "RaidAssociationKind",
-            "FipsId", "ProductDocumentId", "Source", "SourceId", "GovernanceBoard", "HowIdentified", "Cause",
-            "ImpactIfRealised", "Tags", "Risk types", "Categories (multi)", "Divisions (multi)", "Business areas (multi)",
-            "Mitigation actions", "Key risk indicators", "CreatedBy", "UpdatedBy", "ClosedBy", "CreatedAt", "UpdatedAt"
-        };
-        for (var h = 0; h < riskHeaders.Length; h++)
-            wsR.Cell(1, h + 1).Value = riskHeaders[h];
-        var rr = 2;
-        foreach (var r in risks)
-        {
-            var statusLab = r.RiskStatus?.Label ?? r.Status;
-            var tags = string.Join("; ", r.Tags.Select(t => t.Value));
-            var types = string.Join("; ", r.RiskRiskTypes.Select(x => x.RiskType.Name));
-            var cats = string.Join("; ", r.RiskRiskCategories.Select(x => x.RiskCategory.Label));
-            var divs = string.Join("; ", r.RiskDivisions.Select(x => x.Division.Name));
-            var bas = string.Join("; ", r.RiskBusinessAreas.Select(x => x.BusinessAreaLookup.Name));
-            var mitig = string.Join("; ", r.RiskActions.Where(ra => ra.Action != null && !ra.Action.IsDeleted)
-                .Select(ra => ra.Action!.Title));
-            var kris = string.Join(" | ", r.KeyRiskIndicators.OrderBy(k => k.SortOrder).Select(k =>
-                $"{k.Title}{(string.IsNullOrEmpty(k.Metric) ? "" : $" ({k.Metric})")}"));
-
-            wsR.Cell(rr, 1).Value = r.Id;
-            wsR.Cell(rr, 2).Value = $"R-{r.Id:D4}";
-            wsR.Cell(rr, 3).Value = r.Title;
-            wsR.Cell(rr, 4).Value = r.Description;
-            wsR.Cell(rr, 5).Value = r.Notes;
-            wsR.Cell(rr, 6).Value = r.Category;
-            wsR.Cell(rr, 7).Value = r.BusinessArea;
-            wsR.Cell(rr, 8).Value = r.Status;
-            wsR.Cell(rr, 9).Value = statusLab;
-            wsR.Cell(rr, 10).Value = r.RiskTier?.Name;
-            wsR.Cell(rr, 11).Value = r.RiskPriority?.Label;
-            wsR.Cell(rr, 12).Value = r.Likelihood?.Label;
-            wsR.Cell(rr, 13).Value = r.ImpactLevel?.Label;
-            wsR.Cell(rr, 14).Value = r.Proximity?.Label;
-            wsR.Cell(rr, 15).Value = r.RiskCategory?.Label;
-            wsR.Cell(rr, 16).Value = r.ImpactRating;
-            wsR.Cell(rr, 17).Value = r.LikelihoodRating;
-            wsR.Cell(rr, 18).Value = r.RiskScore;
-            wsR.Cell(rr, 19).Value = r.InherentScore;
-            wsR.Cell(rr, 20).Value = r.ResidualScore;
-            wsR.Cell(rr, 21).Value = r.ResidualImpact;
-            wsR.Cell(rr, 22).Value = r.ResidualLikelihood;
-            wsR.Cell(rr, 23).Value = r.Response;
-            wsR.Cell(rr, 24).Value = r.ResponseStrategy;
-            wsR.Cell(rr, 25).Value = r.ProximityDate?.ToString("u", ci);
-            wsR.Cell(rr, 26).Value = r.IdentifiedDate?.ToString("u", ci);
-            wsR.Cell(rr, 27).Value = r.NextReviewDate?.ToString("u", ci);
-            wsR.Cell(rr, 28).Value = r.LastReviewDate?.ToString("u", ci);
-            wsR.Cell(rr, 29).Value = r.ClosedDate?.ToString("u", ci);
-            wsR.Cell(rr, 30).Value = r.TargetDate?.ToString("u", ci);
-            wsR.Cell(rr, 31).Value = r.OwnerEmail;
-            wsR.Cell(rr, 32).Value = UserDisp(r.OwnerUser) ?? r.OwnerEmail;
-            wsR.Cell(rr, 33).Value = UserDisp(r.SroUser);
-            wsR.Cell(rr, 34).Value = r.ProjectId;
-            wsR.Cell(rr, 35).Value = r.Project?.Title;
-            wsR.Cell(rr, 36).Value = r.PrimaryProductId;
-            wsR.Cell(rr, 37).Value = r.PrimaryProduct != null
-                ? (r.PrimaryProduct.DisplayName ?? r.PrimaryProduct.FipsId)
-                : null;
-            wsR.Cell(rr, 38).Value = r.RaidAssociationKind;
-            wsR.Cell(rr, 39).Value = r.FipsId;
-            wsR.Cell(rr, 40).Value = r.ProductDocumentId;
-            wsR.Cell(rr, 41).Value = r.Source;
-            wsR.Cell(rr, 42).Value = r.SourceId;
-            wsR.Cell(rr, 43).Value = r.GovernanceBoard?.Label;
-            wsR.Cell(rr, 44).Value = r.HowIdentified;
-            wsR.Cell(rr, 45).Value = r.Cause;
-            wsR.Cell(rr, 46).Value = r.ImpactIfRealised;
-            wsR.Cell(rr, 47).Value = tags;
-            wsR.Cell(rr, 48).Value = types;
-            wsR.Cell(rr, 49).Value = cats;
-            wsR.Cell(rr, 50).Value = divs;
-            wsR.Cell(rr, 51).Value = bas;
-            wsR.Cell(rr, 52).Value = mitig;
-            wsR.Cell(rr, 53).Value = kris;
-            wsR.Cell(rr, 54).Value = UserDisp(r.CreatedByUser);
-            wsR.Cell(rr, 55).Value = UserDisp(r.UpdatedByUser);
-            wsR.Cell(rr, 56).Value = UserDisp(r.ClosedByUser);
-            wsR.Cell(rr, 57).Value = r.CreatedAt.ToString("u", ci);
-            wsR.Cell(rr, 58).Value = r.UpdatedAt.ToString("u", ci);
-            rr++;
-        }
-
-        wsR.Row(1).Style.Font.Bold = true;
-        if (rr > 2)
-            wsR.Range(1, 1, rr - 1, riskHeaders.Length).SetAutoFilter();
-        wsR.SheetView.FreezeRows(1);
-        wsR.Columns().AdjustToContents(1, 1, 80, 120);
+        WriteRisksExcelWorksheet(wb.Worksheets.Add("Risks"), risks);
 
         // --- Issues ---
         var wsI = wb.Worksheets.Add("Issues");
@@ -390,5 +316,109 @@ public partial class ModernRaidController
         await using var ms = new MemoryStream();
         wb.SaveAs(ms);
         return ms.ToArray();
+    }
+
+    private static void WriteRisksExcelWorksheet(IXLWorksheet wsR, List<Risk> risks)
+    {
+        static string? UserDisp(User? u) => u == null ? null : (u.Name ?? u.Email);
+        var ci = CultureInfo.InvariantCulture;
+
+        var riskHeaders = new[]
+        {
+            "Id", "Reference", "Title", "Description", "Notes", "LegacyCategory", "LegacyBusinessArea", "LegacyStatus",
+            "Status (lookup)", "Tier", "Priority", "Likelihood (lookup)", "Impact level (lookup)", "Proximity (lookup)",
+            "Primary category (lookup)", "ImpactRating", "LikelihoodRating", "RiskScore", "InherentScore", "ResidualScore",
+            "ResidualImpact", "ResidualLikelihood", "Response (legacy)", "ResponseStrategy", "ProximityDate",
+            "IdentifiedDate", "NextReviewDate", "LastReviewDate", "ClosedDate", "TargetDate", "OwnerEmail",
+            "Owner", "SRO", "ProjectId", "Work item", "PrimaryProductId", "Primary product", "RaidAssociationKind",
+            "FipsId", "ProductDocumentId", "Source", "SourceId", "GovernanceBoard", "HowIdentified", "Cause",
+            "ImpactIfRealised", "Tags", "Risk types", "Categories (multi)", "Divisions (multi)", "Business areas (multi)",
+            "Mitigation actions", "Key risk indicators", "CreatedBy", "UpdatedBy", "ClosedBy", "CreatedAt", "UpdatedAt"
+        };
+        for (var h = 0; h < riskHeaders.Length; h++)
+            wsR.Cell(1, h + 1).Value = riskHeaders[h];
+
+        var rr = 2;
+        foreach (var r in risks)
+        {
+            var statusLab = r.RiskStatus?.Label ?? r.Status;
+            var tags = string.Join("; ", r.Tags.Select(t => t.Value));
+            var types = string.Join("; ", r.RiskRiskTypes.Select(x => x.RiskType.Name));
+            var cats = string.Join("; ", r.RiskRiskCategories.Select(x => x.RiskCategory.Label));
+            var divs = string.Join("; ", r.RiskDivisions.Select(x => x.Division.Name));
+            var bas = string.Join("; ", r.RiskBusinessAreas.Select(x => x.BusinessAreaLookup.Name));
+            var mitig = string.Join("; ", r.RiskActions.Where(ra => ra.Action != null && !ra.Action.IsDeleted)
+                .Select(ra => ra.Action!.Title));
+            var kris = string.Join(" | ", r.KeyRiskIndicators.OrderBy(k => k.SortOrder).Select(k =>
+                $"{k.Title}{(string.IsNullOrEmpty(k.Metric) ? "" : $" ({k.Metric})")}"));
+
+            wsR.Cell(rr, 1).Value = r.Id;
+            wsR.Cell(rr, 2).Value = $"R-{r.Id:D4}";
+            wsR.Cell(rr, 3).Value = r.Title;
+            wsR.Cell(rr, 4).Value = r.Description;
+            wsR.Cell(rr, 5).Value = r.Notes;
+            wsR.Cell(rr, 6).Value = r.Category;
+            wsR.Cell(rr, 7).Value = r.BusinessArea;
+            wsR.Cell(rr, 8).Value = r.Status;
+            wsR.Cell(rr, 9).Value = statusLab;
+            wsR.Cell(rr, 10).Value = r.RiskTier?.Name;
+            wsR.Cell(rr, 11).Value = r.RiskPriority?.Label;
+            wsR.Cell(rr, 12).Value = r.Likelihood?.Label;
+            wsR.Cell(rr, 13).Value = r.ImpactLevel?.Label;
+            wsR.Cell(rr, 14).Value = r.Proximity?.Label;
+            wsR.Cell(rr, 15).Value = r.RiskCategory?.Label;
+            wsR.Cell(rr, 16).Value = r.ImpactRating;
+            wsR.Cell(rr, 17).Value = r.LikelihoodRating;
+            wsR.Cell(rr, 18).Value = r.RiskScore;
+            wsR.Cell(rr, 19).Value = r.InherentScore;
+            wsR.Cell(rr, 20).Value = r.ResidualScore;
+            wsR.Cell(rr, 21).Value = r.ResidualImpact;
+            wsR.Cell(rr, 22).Value = r.ResidualLikelihood;
+            wsR.Cell(rr, 23).Value = r.Response;
+            wsR.Cell(rr, 24).Value = r.ResponseStrategy;
+            wsR.Cell(rr, 25).Value = r.ProximityDate?.ToString("u", ci);
+            wsR.Cell(rr, 26).Value = r.IdentifiedDate?.ToString("u", ci);
+            wsR.Cell(rr, 27).Value = r.NextReviewDate?.ToString("u", ci);
+            wsR.Cell(rr, 28).Value = r.LastReviewDate?.ToString("u", ci);
+            wsR.Cell(rr, 29).Value = r.ClosedDate?.ToString("u", ci);
+            wsR.Cell(rr, 30).Value = r.TargetDate?.ToString("u", ci);
+            wsR.Cell(rr, 31).Value = r.OwnerEmail;
+            wsR.Cell(rr, 32).Value = UserDisp(r.OwnerUser) ?? r.OwnerEmail;
+            wsR.Cell(rr, 33).Value = UserDisp(r.SroUser);
+            wsR.Cell(rr, 34).Value = r.ProjectId;
+            wsR.Cell(rr, 35).Value = r.Project?.Title;
+            wsR.Cell(rr, 36).Value = r.PrimaryProductId;
+            wsR.Cell(rr, 37).Value = r.PrimaryProduct != null
+                ? (r.PrimaryProduct.DisplayName ?? r.PrimaryProduct.FipsId)
+                : null;
+            wsR.Cell(rr, 38).Value = r.RaidAssociationKind;
+            wsR.Cell(rr, 39).Value = r.FipsId;
+            wsR.Cell(rr, 40).Value = r.ProductDocumentId;
+            wsR.Cell(rr, 41).Value = r.Source;
+            wsR.Cell(rr, 42).Value = r.SourceId;
+            wsR.Cell(rr, 43).Value = r.GovernanceBoard?.Label;
+            wsR.Cell(rr, 44).Value = r.HowIdentified;
+            wsR.Cell(rr, 45).Value = r.Cause;
+            wsR.Cell(rr, 46).Value = r.ImpactIfRealised;
+            wsR.Cell(rr, 47).Value = tags;
+            wsR.Cell(rr, 48).Value = types;
+            wsR.Cell(rr, 49).Value = cats;
+            wsR.Cell(rr, 50).Value = divs;
+            wsR.Cell(rr, 51).Value = bas;
+            wsR.Cell(rr, 52).Value = mitig;
+            wsR.Cell(rr, 53).Value = kris;
+            wsR.Cell(rr, 54).Value = UserDisp(r.CreatedByUser);
+            wsR.Cell(rr, 55).Value = UserDisp(r.UpdatedByUser);
+            wsR.Cell(rr, 56).Value = UserDisp(r.ClosedByUser);
+            wsR.Cell(rr, 57).Value = r.CreatedAt.ToString("u", ci);
+            wsR.Cell(rr, 58).Value = r.UpdatedAt.ToString("u", ci);
+            rr++;
+        }
+
+        wsR.Row(1).Style.Font.Bold = true;
+        if (rr > 2)
+            wsR.Range(1, 1, rr - 1, riskHeaders.Length).SetAutoFilter();
+        wsR.SheetView.FreezeRows(1);
+        wsR.Columns().AdjustToContents(1, 1, 80, 120);
     }
 }
