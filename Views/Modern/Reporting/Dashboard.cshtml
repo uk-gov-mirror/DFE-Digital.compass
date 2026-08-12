@@ -81,6 +81,11 @@
         Description = "Risks, issues, heatmaps, trends, and views by tier, directorate, and business area."
       })
       @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingDashboardCard.cshtml", new ReportingDashboardCardViewModel {
+        Title = "Risks by tier",
+        Href = Url.Action("RisksByTier", "ModernReporting") ?? "#",
+        Description = "Open risks grouped by governance tier with residual, current and inherent scores, mitigation, freshness, and a directorate matrix."
+      })
+      @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingDashboardCard.cshtml", new ReportingDashboardCardViewModel {
         Title = "RAID review report",
         Href = Url.Action("RaidReviewProgress", "ModernReporting") ?? "#",
         Description = "Monthly review completion for open risks and issues, with directorate and business area league tables."

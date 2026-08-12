@@ -1,0 +1,76 @@
+@using Compass.ViewModels.Modern
+@model IReadOnlyList<RisksByTierRiskRow>
+@{
+  var risks = Model ?? Array.Empty<RisksByTierRiskRow>();
+  var regionId = ViewData["TableRegionId"] as string ?? "rbt-tier-table";
+  string FmtDate(DateTime? dt) => dt.HasValue
+      ? dt.Value.ToString("d MMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("en-GB"))
+      : "—";
+}
+
+<div class="mr-report-table-region govuk-!-margin-bottom-0" data-reporting-table-region data-table-id="@regionId">
+  @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingTableControlsToolbar.cshtml")
+  <div class="mr-table-stack">
+    <div class="mr-report-table-scroll" data-reporting-table-scroll>
+      <div class="dfe-f-table-wrapper" data-module="dfe-f-table">
+        <div class="govuk-visually-hidden" aria-live="polite" data-dfe-table-sort-live></div>
+        <table class="govuk-table govuk-table--small-text-until-tablet dfe-f-table--condensed rbt-risk-table"@if (ViewData["TableId"] is string tableId && !string.IsNullOrWhiteSpace(tableId)) { <text> id="@tableId"</text> }>
+          <caption class="govuk-table__caption govuk-visually-hidden">Risks in tier</caption>
+          <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+              <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Risk</button></th>
+              <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Residual</button></th>
+              <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Current</button></th>
+              <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Inherent</button></th>
+              <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Mitigation</button></th>
+              <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Last reviewed</button></th>
+              <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Last updated</button></th>
+              <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Created</button></th>
+              <th scope="col" class="govuk-table__header govuk-table__header--numeric" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Days since update</button></th>
+              <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Work item / project</button></th>
+              <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Directorate</button></th>
+            </tr>
+          </thead>
+          <tbody class="govuk-table__body">
+            @foreach (var risk in risks)
+            {
+              <tr class="govuk-table__row">
+                <td class="govuk-table__cell">
+                  @await Html.PartialAsync("~/Views/Modern/Reporting/_RisksByTierRiskTitleButton.cshtml", risk)
+                </td>
+                <td class="govuk-table__cell">@risk.ResidualLikelihoodImpact</td>
+                <td class="govuk-table__cell">@risk.CurrentLikelihoodImpact</td>
+                <td class="govuk-table__cell">@risk.InherentLikelihoodImpact</td>
+                <td class="govuk-table__cell">@(string.IsNullOrWhiteSpace(risk.Mitigation) ? "—" : risk.Mitigation)</td>
+                <td class="govuk-table__cell">@FmtDate(risk.LastReviewedAt)</td>
+                <td class="govuk-table__cell">@FmtDate(risk.LastUpdatedAt)</td>
+                <td class="govuk-table__cell">@FmtDate(risk.CreatedAt)</td>
+                <td class="govuk-table__cell govuk-table__cell--numeric">
+                  @if (risk.DaysSinceLastUpdate >= 30 && !risk.IsClosed)
+                  {
+                    <span class="dfe-f-badge dfe-f-badge--small dfe-f-badge--red">@risk.DaysSinceLastUpdate</span>
+                  }
+                  else
+                  {
+                    @risk.DaysSinceLastUpdate
+                  }
+                </td>
+                <td class="govuk-table__cell">
+                  @if (!string.IsNullOrWhiteSpace(risk.WorkItemUrl))
+                  {
+                    <a class="govuk-link govuk-link--no-visited-state" href="@risk.WorkItemUrl">@risk.WorkItemOrProject</a>
+                  }
+                  else
+                  {
+                    @risk.WorkItemOrProject
+                  }
+                </td>
+                <td class="govuk-table__cell">@risk.Directorate</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
