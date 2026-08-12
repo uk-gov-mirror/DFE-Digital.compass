@@ -567,6 +567,7 @@ builder.Services.AddScoped<Compass.Services.Modern.IWorkServiceRegisterLinkServi
 builder.Services.AddScoped<Compass.Services.Modern.IWorkScopedExcelExportService, Compass.Services.Modern.WorkScopedExcelExportService>();
 builder.Services.AddScoped<ModernMonthlyReportService>();
 builder.Services.AddScoped<ModernRaidReviewProgressService>();
+builder.Services.AddScoped<ModernRisksByTierReportService>();
 builder.Services.AddScoped<ModernRaidRegisterCoverageReportService>();
 builder.Services.AddScoped<ModernRaidReportingService>();
 builder.Services.AddScoped<ModernRaidReportService>();

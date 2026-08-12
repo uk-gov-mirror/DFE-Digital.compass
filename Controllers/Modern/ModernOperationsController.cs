@@ -813,6 +813,17 @@ public class ModernOperationsController : Controller
 
         var vm = await RaidEscalationManagementViewModelBuilder.BuildAsync(_db, tab, ct);
 
+        var email = CurrentUserEmail?.Trim();
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            var permissions = HttpContext.RequestServices.GetRequiredService<IPermissionService>();
+            ViewBag.CanActionTierChanges = await permissions.IsCentralOperationsAdminOrSuperAdminAsync(email);
+        }
+        else
+        {
+            ViewBag.CanActionTierChanges = false;
+        }
+
         return View("~/Views/Modern/Operations/RaidEscalations.cshtml", vm);
     }
 
@@ -960,19 +971,122 @@ public class ModernOperationsController : Controller
             ? "—"
             : (string.IsNullOrWhiteSpace(u.Name) ? (u.Email ?? "Unknown") : u.Name);
 
+    private static int? InferFromTierIdForBackfill(
+        RaidEscalationTierChangeRequest? lastApproved,
+        RiskTier proposedTier,
+        IReadOnlyList<RiskTier> activeTiers,
+        bool assumeEscalation)
+    {
+        if (lastApproved?.FromRiskTierId is int fromId)
+            return fromId;
+
+        var list = activeTiers.Where(t => t.IsActive).ToList();
+        var proposedLevel = RiskTierGovernance.ResolveLevel(proposedTier, list);
+        var fromLevel = assumeEscalation ? proposedLevel + 1 : proposedLevel - 1;
+        if (fromLevel < 1)
+            fromLevel = 1;
+
+        var operational = list
+            .Where(t => !t.IsProposedTier)
+            .FirstOrDefault(t => RiskTierGovernance.ResolveLevel(t, list) == fromLevel);
+
+        operational ??= list
+            .Where(t => !t.IsProposedTier)
+            .OrderByDescending(t => RiskTierGovernance.ResolveLevel(t, list))
+            .FirstOrDefault();
+
+        return operational?.Id;
+    }
+
+    /// <summary>Ensure a pending tier-change request exists for a risk on a proposed tier, then open the review screen.</summary>
+    [HttpGet("raid/escalations/action/risk/{riskId:int}")]
+    [RequireCentralOpsAdmin]
+    [ServiceFilter(typeof(Compass.Filters.RaidFeatureGateFilter))]
+    public async Task<IActionResult> RaidEscalationActionForRisk(int riskId, string? returnTab, string? returnUrl, CancellationToken ct)
+    {
+        SetNav("operations-raid");
+        var listTab = NormaliseRaidEscalationListTab(returnTab);
+
+        var existingRequestId = await _db.RaidEscalationTierChangeRequests.AsNoTracking()
+            .Where(x => x.RiskId == riskId
+                && x.RecordType == "risk"
+                && x.Status == "pending")
+            .OrderByDescending(x => x.SubmittedAt)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (existingRequestId is int existingId)
+        {
+            return RedirectToAction(
+                nameof(RaidEscalationAction),
+                new { requestId = existingId, returnTab = listTab, returnUrl });
+        }
+
+        var risk = await _db.Risks
+            .Include(r => r.RiskTier)
+            .Include(r => r.OwnerUser)
+            .FirstOrDefaultAsync(r => r.Id == riskId && !r.IsDeleted && r.ClosedDate == null, ct);
+
+        if (risk?.RiskTier is not { IsProposedTier: true } || risk.RiskTierId is not int proposedTierId)
+        {
+            TempData["ErrorMessage"] = "This risk is not waiting on a proposed tier change.";
+            return RedirectToAction(nameof(RaidEscalations), new { tab = listTab });
+        }
+
+        var activeTiers = await _db.RiskTiers.AsNoTracking()
+            .Where(t => t.IsActive)
+            .ToListAsync(ct);
+
+        var lastApproved = await _db.RaidEscalationTierChangeRequests.AsNoTracking()
+            .Where(x => x.RiskId == riskId && x.RecordType == "risk" && x.Status == "approved")
+            .OrderByDescending(x => x.DecidedAt ?? x.SubmittedAt)
+            .FirstOrDefaultAsync(ct);
+
+        var assumeEscalation = listTab == "escalations";
+        var fromTierId = InferFromTierIdForBackfill(lastApproved, risk.RiskTier, activeTiers, assumeEscalation);
+        if (fromTierId == null)
+        {
+            TempData["ErrorMessage"] =
+                "Could not determine the risk's previous tier. Check tier configuration in Admin → RAID.";
+            return RedirectToAction(nameof(RaidEscalations), new { tab = listTab });
+        }
+
+        var req = new RaidEscalationTierChangeRequest
+        {
+            RecordType = "risk",
+            RiskId = riskId,
+            FromRiskTierId = fromTierId,
+            ToRiskTierId = proposedTierId,
+            Rationale = "Risk is on a proposed tier awaiting Operations review.",
+            Status = "pending",
+            SubmittedAt = risk.UpdatedAt,
+            SubmittedByUserId = risk.OwnerUserId
+        };
+
+        _db.RaidEscalationTierChangeRequests.Add(req);
+        await _db.SaveChangesAsync(ct);
+
+        return RedirectToAction(
+            nameof(RaidEscalationAction),
+            new { requestId = req.Id, returnTab = listTab, returnUrl });
+    }
+
     /// <summary>Primary URL for operations to approve/reject a tier request (<c>…/action/{id}</c>).</summary>
     [HttpGet("raid/escalations/action/{requestId:int}")]
+    [RequireCentralOpsAdmin]
     [ServiceFilter(typeof(Compass.Filters.RaidFeatureGateFilter))]
     public Task<IActionResult> RaidEscalationAction(int requestId, string? returnTab, string? returnUrl, CancellationToken ct) =>
         RaidEscalationReview(requestId, returnTab, returnUrl, ct);
 
     /// <summary>Legacy URL — use <see cref="RaidEscalationAction" /> (…/action/{id}).</summary>
     [HttpGet("raid/escalations/manage/{requestId:int}")]
+    [RequireCentralOpsAdmin]
     [ServiceFilter(typeof(Compass.Filters.RaidFeatureGateFilter))]
     public Task<IActionResult> ManageRaidEscalationRequest(int requestId, string? returnTab, string? returnUrl, CancellationToken ct) =>
         RaidEscalationReview(requestId, returnTab, returnUrl, ct);
 
     [HttpGet("raid/escalations/review/{requestId:int}")]
+    [RequireCentralOpsAdmin]
     [ServiceFilter(typeof(Compass.Filters.RaidFeatureGateFilter))]
     public async Task<IActionResult> RaidEscalationReview(int requestId, string? returnTab, string? returnUrl, CancellationToken ct)
     {
@@ -1021,19 +1135,10 @@ public class ModernOperationsController : Controller
 
         // On submit, the risk row is moved to the *proposed* target tier so queues align (see RiskEscalationRequestPost).
         // "Current" for reviewers must be the pre-request band from the request snapshot, not r.RiskTier (which matches "to").
-        var currentTierName = "—";
-        if (req.FromRiskTier is { } snapFrom)
-        {
-            var n = snapFrom.Name?.Trim();
-            if (!string.IsNullOrEmpty(n))
-                currentTierName = n;
-        }
-
-        if (string.Equals(currentTierName, "—", StringComparison.Ordinal)
-            && !string.IsNullOrEmpty(r.RiskTier?.Name?.Trim()))
-        {
-            currentTierName = r.RiskTier!.Name!.Trim();
-        }
+        var fromTierSnap = req.FromRiskTier ?? activeTiers.FirstOrDefault(t => t.Id == req.FromRiskTierId);
+        var currentTierName = !string.IsNullOrWhiteSpace(fromTierSnap?.Name)
+            ? fromTierSnap!.Name.Trim()
+            : "—";
 
         var opTierRows = activeTiers
             .Where(t => !t.IsProposedTier)
@@ -1043,7 +1148,7 @@ public class ModernOperationsController : Controller
             .ToList();
 
         int? rejectDefault = null;
-        if (req.FromRiskTier is { } fromSnap)
+        if (fromTierSnap is { } fromSnap)
         {
             if (!fromSnap.IsProposedTier && opTierRows.Any(o => o.Id == fromSnap.Id))
                 rejectDefault = fromSnap.Id;
@@ -1055,17 +1160,15 @@ public class ModernOperationsController : Controller
             }
         }
 
-        if (rejectDefault == null && r.RiskTier is { } curRt)
+        if (rejectDefault == null && fromTierSnap is { } rejectFromSnap)
         {
-            if (!curRt.IsProposedTier && opTierRows.Any(o => o.Id == r.RiskTierId))
-                rejectDefault = r.RiskTierId;
-            else
-            {
-                var resolved = RiskTierGovernance.ResolveOperationalTierMatchingGovernance(curRt, activeTiers);
-                if (resolved != null && opTierRows.Any(o => o.Id == resolved.Id))
-                    rejectDefault = resolved.Id;
-            }
+            var resolved = RiskTierGovernance.ResolveOperationalTierMatchingGovernance(rejectFromSnap, activeTiers);
+            if (resolved != null && opTierRows.Any(o => o.Id == resolved.Id))
+                rejectDefault = resolved.Id;
         }
+
+        if (rejectDefault == null && r.RiskTier is { IsProposedTier: false } && r.RiskTierId is int liveTierId && opTierRows.Any(o => o.Id == liveTierId))
+            rejectDefault = liveTierId;
 
         if (rejectDefault == null && opTierRows.Count > 0)
             rejectDefault = opTierRows[0].Id;
@@ -1073,6 +1176,11 @@ public class ModernOperationsController : Controller
         var defaultRejectName = rejectDefault is int defRid
             ? opTierRows.FirstOrDefault(o => o.Id == defRid)?.Name ?? "—"
             : "—";
+
+        var fromTierForClass = req.FromRiskTier ?? activeTiers.FirstOrDefault(t => t.Id == req.FromRiskTierId);
+        var toTierForClass = toTier;
+        var isEscalation = fromTierForClass != null && toTierForClass != null
+            && RiskTierGovernance.IsEscalation(fromTierForClass, toTierForClass, activeTiers);
 
         var vm = new ModernRaidEscalationReviewViewModel
         {
@@ -1092,6 +1200,7 @@ public class ModernOperationsController : Controller
             RiskDetailUrl = Url.Action("RiskDetail", "ModernRaid", new { id = r.Id }) ?? "#",
             ListReturnUrl = listReturnPath,
             ListReturnTab = listTab,
+            IsEscalation = isEscalation,
             RejectTierOptions = opTierRows,
             RejectTierDefaultId = rejectDefault
         };
@@ -1101,6 +1210,7 @@ public class ModernOperationsController : Controller
 
     [HttpPost("raid/escalations/decide")]
     [ValidateAntiForgeryToken]
+    [RequireCentralOpsAdmin]
     [ServiceFilter(typeof(Compass.Filters.RaidFeatureGateFilter))]
     public async Task<IActionResult> RaidEscalationDecide(
         int requestId,
@@ -1186,11 +1296,11 @@ public class ModernOperationsController : Controller
                 return RedirectToReviewError("The requested target tier is no longer available.");
             }
 
-            var operationalTarget = RiskTierGovernance.ResolveOperationalTierMatchingGovernance(toTier, activeTiers);
+            var operationalTarget = RiskTierGovernance.ResolveApprovalOperationalTier(toTier, activeTiers);
             if (operationalTarget == null)
             {
                 return RedirectToReviewError(
-                    "No operational risk tier is configured for the requested governance level. Check Admin → RAID → Risk tiers.");
+                    "No operational risk tier is configured for the requested governance level. In Admin → RAID → Risk tiers, add an active operational band (Tier 1, Tier 2, Tier 3) that matches the proposed tier level.");
             }
 
             req.Risk.RiskTierId = operationalTarget.Id;

@@ -1,0 +1,440 @@
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using Compass.Models.Modern.Work
+@using Compass.ViewModels.Modern
+@using Microsoft.AspNetCore.Html
+@model ModernRisksByTierReportViewModel
+@{
+  ViewData["Title"] = "Risks by tier";
+  var m = Model ?? new ModernRisksByTierReportViewModel();
+  var jsonOpts = new JsonSerializerOptions
+  {
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+  };
+  var drillConfigJson = JsonSerializer.Serialize(new
+  {
+    risksByKey = m.DrillRisksByKey,
+    risksById = m.TierGroups
+      .SelectMany(g => g.Risks)
+      .GroupBy(r => r.Id)
+      .ToDictionary(g => g.Key.ToString(), g => g.First()),
+    likelihoodScale = m.LikelihoodScaleLabels,
+    impactScale = m.ImpactScaleLabels,
+    canActionTierChanges = m.CanActionTierChanges
+  }, jsonOpts);
+
+  string DirKey(int? id) => id?.ToString() ?? "*";
+  string TierKey(int? id) => id?.ToString() ?? "*";
+
+  IHtmlContent MatrixCountSpan(int count, int? dirId, int? tierId, string label, bool strong = false)
+  {
+    if (count == 0)
+      return new HtmlString("<span class=\"mr-ba-num mr-ba-num--muted\">0</span>");
+
+    var classes = "mr-ba-num mr-ba-drill rbt-matrix-drill";
+    if (strong) classes += " mr-ba-num--strong";
+    else classes += " mr-ba-num--highlight";
+
+    return new HtmlString(
+      $"<span class=\"{classes}\" data-rbt-dir=\"{DirKey(dirId)}\" data-rbt-tier=\"{TierKey(tierId)}\" data-rbt-label=\"{System.Net.WebUtility.HtmlEncode(label)}\" role=\"button\" tabindex=\"0\">{count}</span>");
+  }
+}
+
+@section Breadcrumbs {
+  <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Index", "ModernDashboard")">Home</a></li>
+  <li class="govuk-breadcrumbs__list-item"><a class="govuk-breadcrumbs__link" href="@Url.Action("Dashboard", "ModernReporting")">Reporting</a></li>
+  <li class="govuk-breadcrumbs__list-item" aria-current="page">Risks by tier</li>
+}
+
+<div class="mr-dash">
+  @{
+    var lede = await Html.PartialAsync("_GovukBodyParagraph",
+      "Risk-team oversight of open risks by governance tier. Review residual, current and inherent scores, mitigation, freshness, and directorate coverage.");
+  }
+  @await Html.PartialAsync("_ModernPageHeader", new ModernPageHeaderViewModel
+  {
+    Caption = "Reporting",
+    Title = "Risks by tier",
+    Lede = lede
+  })
+
+  @if (TempData["ErrorMessage"] is string errorMsg && !string.IsNullOrWhiteSpace(errorMsg))
+  {
+    <div class="govuk-error-summary govuk-!-margin-bottom-4" data-module="govuk-error-summary">
+      <div role="alert">
+        <h2 class="govuk-error-summary__title">There is a problem</h2>
+        <div class="govuk-error-summary__body"><p class="govuk-body">@errorMsg</p></div>
+      </div>
+    </div>
+  }
+
+  <div class="mr-toolbar mr-toolbar--compact govuk-!-margin-bottom-4">
+    <div class="mr-toolbar__row">
+      <form method="get" action="@Url.Action("RisksByTier", "ModernReporting")" class="mr-toolbar__filters mr-toolbar__filters--compact" data-page-loading>
+        <select name="directorateId" class="govuk-select" aria-label="Directorate">
+          <option value="">All directorates</option>
+          @foreach (var d in m.Directorates)
+          {
+            if (m.FilterDirectorateId == d.Id)
+            {
+              <option value="@d.Id" selected>@d.Name</option>
+            }
+            else
+            {
+              <option value="@d.Id">@d.Name</option>
+            }
+          }
+        </select>
+        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+          <div class="govuk-checkboxes__item">
+            <input class="govuk-checkboxes__input" id="includeClosed" name="includeClosed" type="checkbox" value="true"@(m.IncludeClosed ? " checked" : "")>
+            <label class="govuk-label govuk-checkboxes__label" for="includeClosed">Include closed</label>
+          </div>
+        </div>
+        <button type="submit" class="govuk-button govuk-!-margin-bottom-0">Apply</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="dfe-f-toggle-group mr-report-toggle-group govuk-!-margin-bottom-3" data-module="dfe-f-toggle-group" id="rbt-report-sections">
+    <div class="mr-report-view-controls govuk-!-margin-bottom-3" role="toolbar" aria-label="Report section controls">
+      <span class="mr-report-view-controls__label govuk-body-s govuk-!-font-weight-bold">Sections</span>
+      <div class="mr-report-view-controls__actions">
+        <button type="button" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-dfe-toggle-expand-all>Expand all sections</button>
+        <button type="button" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-dfe-toggle-collapse-all>Collapse all sections</button>
+      </div>
+    </div>
+
+    <div class="dfe-f-toggle-group__items">
+      <div class="mr-report-section-panel dfe-f-toggle govuk-!-margin-bottom-3" data-module="dfe-f-toggle" data-rbt-section-id="summary" data-rbt-section-title="Summary">
+        <div class="dfe-f-toggle__title-wrapper">
+          <h2 class="dfe-f-toggle__heading">
+            <button type="button" class="dfe-f-toggle__button" aria-expanded="true" aria-controls="rbt-toggle-summary-content" id="rbt-toggle-summary-button">
+              <span class="dfe-f-toggle__icon" aria-hidden="true"></span>
+              <span class="dfe-f-toggle__title" id="rbt-h-summary">Summary</span>
+              <span class="mr-toggle-panel__meta"><span class="@WorkBadgeCss.ToggleCountBadgeClass(m.TotalRiskCount)">@m.TotalRiskCount</span></span>
+            </button>
+          </h2>
+        </div>
+        <div id="rbt-toggle-summary-content" class="dfe-f-toggle__content">
+          <div class="dfe-f-toggle__body govuk-body">
+            <div class="dfe-f-card-grid">
+              <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey">
+                <p class="govuk-body-s dfe-f-stat-card__label">Risks in view</p>
+                <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@m.TotalRiskCount</p>
+              </div>
+              <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey">
+                <p class="govuk-body-s dfe-f-stat-card__label">Open</p>
+                <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@m.OpenRiskCount</p>
+              </div>
+              @if (m.IncludeClosed)
+              {
+                <div class="dfe-f-stat-card dfe-f-stat-card--tint-grey">
+                  <p class="govuk-body-s dfe-f-stat-card__label">Closed</p>
+                  <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@m.ClosedRiskCount</p>
+                </div>
+              }
+              <div class="dfe-f-stat-card dfe-f-stat-card--tint-red">
+                <p class="govuk-body-s dfe-f-stat-card__label">No tier set</p>
+                <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@m.UntieredRiskCount</p>
+              </div>
+              <div class="dfe-f-stat-card dfe-f-stat-card--tint-red">
+                <p class="govuk-body-s dfe-f-stat-card__label">Stale (30+ days)</p>
+                <p class="dfe-f-stat-card__value dfe-f-u-tabular-numbers govuk-body-l">@m.StaleRiskCount</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mr-report-section-panel dfe-f-toggle govuk-!-margin-bottom-3" data-module="dfe-f-toggle" data-rbt-section-id="matrix" data-rbt-section-title="Directorate and tier matrix">
+        <div class="dfe-f-toggle__title-wrapper">
+          <h2 class="dfe-f-toggle__heading">
+            <button type="button" class="dfe-f-toggle__button" aria-expanded="true" aria-controls="rbt-toggle-matrix-content" id="rbt-toggle-matrix-button">
+              <span class="dfe-f-toggle__icon" aria-hidden="true"></span>
+              <span class="dfe-f-toggle__title" id="rbt-h-matrix">Directorate and tier matrix</span>
+              <span class="mr-toggle-panel__meta"><span class="@WorkBadgeCss.ToggleCountBadgeClass(m.TotalRiskCount)">@m.TotalRiskCount</span></span>
+            </button>
+          </h2>
+        </div>
+        <div id="rbt-toggle-matrix-content" class="dfe-f-toggle__content">
+          <div class="dfe-f-toggle__body govuk-body">
+            <section class="mr-section" aria-labelledby="rbt-h-matrix" data-mr-drill-host="rbt-matrix-drilldown-host">
+              <p class="govuk-body-s govuk-hint">Each risk is counted once under its primary directorate. Click a number to show matching risks below. Tier columns follow admin sort order.</p>
+              @if (m.DirectorateMatrix.Count == 0)
+              {
+                <p class="govuk-body">No risks match the current filters.</p>
+              }
+              else
+              {
+                <div class="mr-report-table-region" data-reporting-table-region data-table-id="rbt-matrix">
+                  @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingTableControlsToolbar.cshtml")
+                  <div class="mr-table-stack">
+                    <div class="mr-report-table-scroll" data-reporting-table-scroll>
+                      <table class="govuk-table mr-ba-table" id="rbt-directorate-matrix">
+                      <caption class="govuk-table__caption govuk-visually-hidden">Risk counts by directorate and tier</caption>
+                      <thead class="govuk-table__head">
+                        <tr class="govuk-table__row">
+                          <th scope="col" class="mr-ba-table__fixed mr-ba-table__area-col">Directorate</th>
+                          @foreach (var col in m.TierColumns)
+                          {
+                            <th scope="col" class="mr-ba-table__num-hdr">@col.Name</th>
+                          }
+                          <th scope="col" class="mr-ba-table__num-hdr">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody class="govuk-table__body">
+                        @foreach (var row in m.DirectorateMatrix)
+                        {
+                          <tr class="govuk-table__row">
+                            <th scope="row" class="mr-ba-table__fixed mr-ba-table__area-col">@row.DirectorateName</th>
+                            @for (var i = 0; i < row.CountsByTier.Count; i++)
+                            {
+                              var count = row.CountsByTier[i];
+                              var col = m.TierColumns[i];
+                              var label = $"{row.DirectorateName} — {col.Name}";
+                              <td class="mr-ba-table__num">@MatrixCountSpan(count, row.DirectorateId, col.TierId, label)</td>
+                            }
+                            <td class="mr-ba-table__num">@MatrixCountSpan(row.Total, row.DirectorateId, null, $"{row.DirectorateName} — all tiers", strong: true)</td>
+                          </tr>
+                        }
+                      </tbody>
+                      @if (m.MatrixTotalRow is { } totalRow)
+                      {
+                        <tfoot>
+                          <tr class="mr-ba-table__total-row">
+                            <th scope="row" class="mr-ba-table__fixed mr-ba-table__area-col">Total</th>
+                            @for (var i = 0; i < totalRow.CountsByTier.Count; i++)
+                            {
+                              var count = totalRow.CountsByTier[i];
+                              var col = m.TierColumns[i];
+                              var label = $"Total — {col.Name}";
+                              <td class="mr-ba-table__num">@MatrixCountSpan(count, null, col.TierId, label, strong: true)</td>
+                            }
+                            <td class="mr-ba-table__num">@MatrixCountSpan(totalRow.Total, null, null, "Total — all tiers", strong: true)</td>
+                          </tr>
+                        </tfoot>
+                      }
+                    </table>
+                    </div>
+                  </div>
+                </div>
+                <div id="rbt-matrix-drilldown-host" class="mr-drilldown-host">
+                  <div id="rbt-matrix-drilldown" class="mr-ba-drilldown rbt-matrix-drilldown govuk-!-margin-top-3" hidden>
+                    <div class="mr-ba-drilldown__header">
+                      <h3 class="mr-ba-drilldown__title" id="rbt-matrix-drilldown-title"></h3>
+                      <div class="mr-ba-drilldown__actions">
+                        <button type="button" class="mr-ba-drilldown__close rbt-matrix-drilldown__close" aria-label="Close drill-down">&times;</button>
+                      </div>
+                    </div>
+                    <div class="mr-report-table-region govuk-!-margin-bottom-0" data-reporting-table-region data-table-id="rbt-matrix-drilldown">
+                      @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingTableControlsToolbar.cshtml")
+                      <div class="mr-table-stack">
+                        <div class="mr-report-table-scroll" data-reporting-table-scroll>
+                          <div class="dfe-f-table-wrapper" data-module="dfe-f-table">
+                            <div class="govuk-visually-hidden" aria-live="polite" data-dfe-table-sort-live></div>
+                            <table class="govuk-table govuk-table--small-text-until-tablet dfe-f-table--condensed mr-ba-drilldown-table rbt-risk-table" id="rbt-matrix-drilldown-table">
+                        <caption class="govuk-table__caption govuk-visually-hidden">Risks for selected matrix cell</caption>
+                        <thead class="govuk-table__head">
+                          <tr class="govuk-table__row">
+                            <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Risk</button></th>
+                            <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Residual</button></th>
+                            <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Current</button></th>
+                            <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Inherent</button></th>
+                            <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Mitigation</button></th>
+                            <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Last reviewed</button></th>
+                            <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Last updated</button></th>
+                            <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Created</button></th>
+                            <th scope="col" class="govuk-table__header govuk-table__header--numeric" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Days since update</button></th>
+                            <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Work item / project</button></th>
+                            <th scope="col" class="govuk-table__header" aria-sort="none"><button type="button" class="dfe-f-table-sort-button">Directorate</button></th>
+                          </tr>
+                        </thead>
+                        <tbody id="rbt-matrix-drilldown-body" class="govuk-table__body"></tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+            </section>
+          </div>
+        </div>
+      </div>
+
+      @foreach (var group in m.TierGroups)
+      {
+        var toggleSlug = group.TierId?.ToString() ?? "none";
+        var toggleId = $"rbt-toggle-tier-{toggleSlug}";
+        var contentId = $"rbt-toggle-tier-{toggleSlug}-content";
+        var isFirstTier = group == m.TierGroups.FirstOrDefault(g => g.RiskCount > 0);
+        <div class="mr-report-section-panel dfe-f-toggle govuk-!-margin-bottom-3" data-module="dfe-f-toggle" data-rbt-section-id="tier-@toggleSlug" data-rbt-section-title="@group.TierName">
+          <div class="dfe-f-toggle__title-wrapper">
+            <h2 class="dfe-f-toggle__heading">
+              <button type="button" class="dfe-f-toggle__button" aria-expanded="@(isFirstTier ? "true" : "false")" aria-controls="@contentId" id="@toggleId">
+                <span class="dfe-f-toggle__icon" aria-hidden="true"></span>
+                <span class="dfe-f-toggle__title">@group.TierName</span>
+                <span class="mr-toggle-panel__meta"><span class="@WorkBadgeCss.ToggleCountBadgeClass(group.RiskCount)">@group.RiskCount</span></span>
+              </button>
+            </h2>
+          </div>
+          <div id="@contentId" class="dfe-f-toggle__content"@Html.Raw(isFirstTier ? "" : " hidden")>
+            <div class="dfe-f-toggle__body govuk-body">
+              @if (!string.IsNullOrWhiteSpace(group.TierDescription))
+              {
+                <p class="govuk-body-s govuk-hint govuk-!-margin-bottom-3">@group.TierDescription</p>
+              }
+              @if (group.Risks.Count == 0)
+              {
+                <p class="govuk-body-s dfe-c-text-muted">No risks in this tier.</p>
+              }
+              else
+              {
+                ViewData["TableRegionId"] = $"rbt-tier-{toggleSlug}";
+                @await Html.PartialAsync("~/Views/Modern/Reporting/_RisksByTierRiskTable.cshtml", group.Risks)
+              }
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <p class="govuk-body-s govuk-!-margin-top-4">
+    <a class="govuk-link govuk-link--no-visited-state" href="@Url.Action("Raid", "ModernReporting", new { tab = "risks" })">Open RAID intelligence</a>
+    ·
+    <a class="govuk-link govuk-link--no-visited-state" href="@Url.Action("Tier", "ModernRaid")">RAID by tier matrix</a>
+  </p>
+</div>
+
+@await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingRiskModal.cshtml")
+
+@section Styles {
+  <link rel="stylesheet" href="@Url.Content("~/modern/css/reporting-drilldown.css")" asp-append-version="true" />
+  <link rel="stylesheet" href="@Url.Content("~/modern/css/reporting-table-controls.css")" asp-append-version="true" />
+  <link rel="stylesheet" href="@Url.Content("~/css/raid-spreadsheet.css")" asp-append-version="true" />
+  @await Html.PartialAsync("_MrReportCoreStyles")
+  <style>
+    .mr-report-view-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1rem;
+    }
+    .mr-report-view-controls__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .mr-dash .mr-report-section-panel > .dfe-f-toggle__content {
+      overflow-x: auto;
+      max-width: 100%;
+    }
+    .mr-dash .mr-report-section-panel .dfe-f-toggle__body {
+      min-width: 0;
+      max-width: 100%;
+    }
+    .rbt-matrix-drill--active {
+      outline: 2px solid #1d70b8;
+      outline-offset: 2px;
+    }
+    .rbt-risk-title-btn {
+      border: none;
+      padding: 0;
+      text-decoration: underline;
+      font-weight: 700;
+      text-align: left;
+      background: none;
+      cursor: pointer;
+      color: #1d70b8;
+    }
+    .rbt-rating-trend {
+      border-left: 4px solid #505a5f;
+      padding: 0.75rem 0 0.75rem 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .rbt-rating-trend--worsening { border-left-color: #d4351c; }
+    .rbt-rating-trend--improving { border-left-color: #00703c; }
+    .rbt-rating-trend--mixed { border-left-color: #f47738; }
+    .rbt-rating-band {
+      border-top: 1px solid #b1b4b6;
+      padding-top: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .rbt-rating-band:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+    .rbt-rating-band__header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.5rem 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .rbt-rating-band__title {
+      margin: 0;
+      font-size: 1.125rem;
+    }
+    .rbt-rating-band__summary {
+      margin: 0 0 0.75rem;
+      color: #505a5f;
+    }
+    .rbt-rating-scale {
+      margin-bottom: 0.75rem;
+    }
+    .rbt-rating-scale:last-child {
+      margin-bottom: 0;
+    }
+    .rbt-rating-scale__label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+    .rbt-rating-scale__tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+    .rbt-rating-scale__tag {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      font-size: 0.8125rem;
+      line-height: 1.3;
+      background: #f3f2f1;
+      color: #505a5f;
+      border-radius: 2px;
+    }
+    .rbt-rating-scale__tag--active {
+      background: #1d70b8;
+      color: #fff;
+      font-weight: 700;
+    }
+    .mr-reporting-modal__footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1rem;
+    }
+    .rbt-risk-modal-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .mr-ba-table__group--tier {
+      background: #f0f4f8;
+      border-bottom: 3px solid #1d70b8;
+    }
+  </style>
+}
+
+@section Scripts {
+  <script type="application/json" id="rbt-drilldown-config">@Html.Raw(drillConfigJson)</script>
+  <script src="@Url.Content("~/modern/js/reporting-table-controls.js")" asp-append-version="true" nonce="@Context.Items["Nonce"]"></script>
+  <script src="@Url.Content("~/modern/js/risks-by-tier-report.js")" asp-append-version="true" nonce="@Context.Items["Nonce"]"></script>
+}

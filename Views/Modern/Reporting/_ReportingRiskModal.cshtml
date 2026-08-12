@@ -1,0 +1,37 @@
+@* Tabbed risk modal for reporting drill-down tables (risks by tier). *@
+<div id="rbt-risk-modal" class="mr-reporting-modal" role="dialog" aria-modal="true" aria-labelledby="rbt-risk-modal-title" hidden>
+  <div class="mr-reporting-modal__backdrop" data-rbt-risk-modal-close></div>
+  <div class="mr-reporting-modal__panel">
+    <div class="mr-reporting-modal__header">
+      <div>
+        <h2 id="rbt-risk-modal-title" class="govuk-heading-m govuk-!-margin-bottom-0"></h2>
+        <p id="rbt-risk-modal-reference" class="govuk-body-s govuk-hint govuk-!-margin-bottom-0 govuk-!-margin-top-1"></p>
+      </div>
+      <button type="button" class="mr-reporting-modal__close" aria-label="Close" data-rbt-risk-modal-close>&times;</button>
+    </div>
+    <div class="mr-reporting-modal__tabs" role="tablist" aria-label="Risk details">
+      <button type="button" class="mr-reporting-modal__tab" role="tab" id="rbt-risk-tab-overview" aria-selected="true" aria-controls="rbt-risk-pane-overview" data-rbt-risk-tab="overview">Overview</button>
+      <button type="button" class="mr-reporting-modal__tab" role="tab" id="rbt-risk-tab-ratings" aria-selected="false" aria-controls="rbt-risk-pane-ratings" data-rbt-risk-tab="ratings">Ratings</button>
+      <button type="button" class="mr-reporting-modal__tab" role="tab" id="rbt-risk-tab-description" aria-selected="false" aria-controls="rbt-risk-pane-description" data-rbt-risk-tab="description">Description</button>
+      <button type="button" class="mr-reporting-modal__tab" role="tab" id="rbt-risk-tab-mitigation" aria-selected="false" aria-controls="rbt-risk-pane-mitigation" data-rbt-risk-tab="mitigation">Mitigation</button>
+    </div>
+    <div class="mr-reporting-modal__body">
+      <div id="rbt-risk-pane-overview" class="mr-reporting-modal__pane is-active" role="tabpanel" aria-labelledby="rbt-risk-tab-overview">
+        <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-0" id="rbt-risk-overview-list"></dl>
+      </div>
+      <div id="rbt-risk-pane-ratings" class="mr-reporting-modal__pane" role="tabpanel" aria-labelledby="rbt-risk-tab-ratings" hidden>
+        <div id="rbt-risk-ratings-content"></div>
+      </div>
+      <div id="rbt-risk-pane-description" class="mr-reporting-modal__pane" role="tabpanel" aria-labelledby="rbt-risk-tab-description" hidden>
+        <p id="rbt-risk-description-text" class="govuk-body-s"></p>
+      </div>
+      <div id="rbt-risk-pane-mitigation" class="mr-reporting-modal__pane" role="tabpanel" aria-labelledby="rbt-risk-tab-mitigation" hidden>
+        <p id="rbt-risk-mitigation-text" class="govuk-body-s"></p>
+      </div>
+    </div>
+    <div class="mr-reporting-modal__footer">
+      <div id="rbt-risk-modal-actions" class="rbt-risk-modal-actions" hidden></div>
+      <a id="rbt-risk-modal-view-link" class="govuk-link govuk-link--no-visited-state" href="#">View full risk</a>
+    </div>
+  </div>
+</div>

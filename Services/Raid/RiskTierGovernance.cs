@@ -133,6 +133,10 @@ public static class RiskTierGovernance
         if (toTier == null) return null;
         var list = activeTiers.Where(t => t.IsActive).ToList();
         if (list.Count == 0) return null;
+
+        if (!toTier.IsProposedTier)
+            return toTier;
+
         var targetLevel = ResolveLevel(toTier, list);
         return list
             .Where(t => !t.IsProposedTier)
@@ -140,5 +144,40 @@ public static class RiskTierGovernance
             .OrderBy(t => t.SortOrder)
             .ThenBy(t => t.Id)
             .FirstOrDefault();
+    }
+
+    /// <summary>Operational band to apply when Operations approves a tier-change request.</summary>
+    public static RiskTier? ResolveApprovalOperationalTier(
+        RiskTier? requestedTier,
+        IReadOnlyList<RiskTier> activeTiers)
+    {
+        if (requestedTier == null)
+            return null;
+
+        var list = activeTiers.Where(t => t.IsActive).ToList();
+        if (list.Count == 0)
+            return null;
+
+        var matched = ResolveOperationalTierMatchingGovernance(requestedTier, list);
+        if (matched != null)
+            return matched;
+
+        if (!requestedTier.IsProposedTier)
+            return requestedTier;
+
+        var inferred = TryInferGovernanceLevelFromNameOrCode(requestedTier);
+        if (inferred is int band)
+        {
+            matched = list
+                .Where(t => !t.IsProposedTier)
+                .Where(t => TryInferGovernanceLevelFromNameOrCode(t) == band)
+                .OrderBy(t => t.SortOrder)
+                .ThenBy(t => t.Id)
+                .FirstOrDefault();
+            if (matched != null)
+                return matched;
+        }
+
+        return null;
     }
 }

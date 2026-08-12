@@ -12,6 +12,7 @@ using Compass.ViewModels.Modern;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Compass.Controllers.Modern;
 
@@ -24,6 +25,7 @@ public partial class ModernReportingController : Controller
     private readonly IMonthlyUpdateService _monthlyUpdateService;
     private readonly ModernMonthlyReportService _monthlyReportService;
     private readonly ModernRaidReviewProgressService _raidReviewProgressService;
+    private readonly ModernRisksByTierReportService _risksByTierReportService;
     private readonly ModernRaidRegisterCoverageReportService _raidRegisterCoverageReportService;
     private readonly ModernRaidReportingService _raidReportingService;
     private readonly ModernRaidReportService _raidReportService;
@@ -33,6 +35,7 @@ public partial class ModernReportingController : Controller
     private readonly IModernWorkService _modernWork;
     private readonly IWorkScopedExcelExportService _workScopedExcelExport;
     private readonly IConfiguration _configuration;
+    private readonly IPermissionService _permissionService;
     private readonly ILogger<ModernReportingController> _logger;
 
     public ModernReportingController(
@@ -40,6 +43,7 @@ public partial class ModernReportingController : Controller
         IMonthlyUpdateService monthlyUpdateService,
         ModernMonthlyReportService monthlyReportService,
         ModernRaidReviewProgressService raidReviewProgressService,
+        ModernRisksByTierReportService risksByTierReportService,
         ModernRaidRegisterCoverageReportService raidRegisterCoverageReportService,
         ModernRaidReportingService raidReportingService,
         ModernRaidReportService raidReportService,
@@ -49,12 +53,14 @@ public partial class ModernReportingController : Controller
         IModernWorkService modernWork,
         IWorkScopedExcelExportService workScopedExcelExport,
         IConfiguration configuration,
+        IPermissionService permissionService,
         ILogger<ModernReportingController> logger)
     {
         _context = context;
         _monthlyUpdateService = monthlyUpdateService;
         _monthlyReportService = monthlyReportService;
         _raidReviewProgressService = raidReviewProgressService;
+        _risksByTierReportService = risksByTierReportService;
         _raidRegisterCoverageReportService = raidRegisterCoverageReportService;
         _raidReportingService = raidReportingService;
         _raidReportService = raidReportService;
@@ -64,8 +70,47 @@ public partial class ModernReportingController : Controller
         _modernWork = modernWork;
         _workScopedExcelExport = workScopedExcelExport;
         _configuration = configuration;
+        _permissionService = permissionService;
         _logger = logger;
     }
+
+    private string? CurrentUserEmail =>
+        User.Identity?.Name
+        ?? User.FindFirstValue(ClaimTypes.Email)
+        ?? User.FindFirstValue("preferred_username")
+        ?? User.FindFirstValue("email");
+
+    private async Task<bool> CanActionTierChangesAsync(CancellationToken cancellationToken)
+    {
+        var email = CurrentUserEmail?.Trim();
+        if (string.IsNullOrWhiteSpace(email))
+            return false;
+
+        return await _permissionService.IsCentralOperationsAdminOrSuperAdminAsync(email);
+    }
+
+    private static ModernRisksByTierReportViewModel WithCanActionTierChanges(
+        ModernRisksByTierReportViewModel model,
+        bool canActionTierChanges) =>
+        new()
+        {
+            FilterDirectorateId = model.FilterDirectorateId,
+            IncludeClosed = model.IncludeClosed,
+            Directorates = model.Directorates,
+            OpenRiskCount = model.OpenRiskCount,
+            ClosedRiskCount = model.ClosedRiskCount,
+            TotalRiskCount = model.TotalRiskCount,
+            UntieredRiskCount = model.UntieredRiskCount,
+            StaleRiskCount = model.StaleRiskCount,
+            TierColumns = model.TierColumns,
+            DirectorateMatrix = model.DirectorateMatrix,
+            TierGroups = model.TierGroups,
+            MatrixTotalRow = model.MatrixTotalRow,
+            DrillRisksByKey = model.DrillRisksByKey,
+            LikelihoodScaleLabels = model.LikelihoodScaleLabels,
+            ImpactScaleLabels = model.ImpactScaleLabels,
+            CanActionTierChanges = canActionTierChanges
+        };
 
     private void SetNav(string subNavItem)
     {
@@ -342,6 +387,30 @@ public partial class ModernReportingController : Controller
         var periodLabel = model.MonthName.Replace(" ", "-", StringComparison.Ordinal);
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             $"monthly-submission-progress-{periodLabel}-{DateTime.UtcNow:yyyyMMdd-HHmm}.xlsx");
+    }
+
+    /// <summary>Risks by tier — risk-team oversight grouped by governance tier with directorate matrix.</summary>
+    [HttpGet("risks-by-tier")]
+    [ServiceFilter(typeof(Compass.Filters.RaidFeatureGateFilter))]
+    public async Task<IActionResult> RisksByTier(
+        int? directorateId,
+        bool includeClosed = false,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var model = await _risksByTierReportService.BuildAsync(directorateId, includeClosed, cancellationToken);
+            var canActionTierChanges = await CanActionTierChangesAsync(cancellationToken);
+            SetNav("reporting-risks-by-tier");
+            return View("~/Views/Modern/Reporting/RisksByTier.cshtml", WithCanActionTierChanges(model, canActionTierChanges));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading risks by tier report");
+            TempData["ErrorMessage"] = "An error occurred while loading the risks by tier report. Please try again.";
+            SetNav("reporting-risks-by-tier");
+            return View("~/Views/Modern/Reporting/RisksByTier.cshtml", new ModernRisksByTierReportViewModel());
+        }
     }
 
     /// <summary>RAID monthly review progress — chart and league tables for review completion.</summary>

@@ -2512,6 +2512,17 @@ dialog.fips-cmdb-sync-modal.dfe-f-modal .dfe-f-modal__panel {
     background: #f3f2f1;
 }
 
+.modern-operations-raid-escalations__table-scroll {
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+.modern-operations-raid-escalations__actions-cell {
+    min-width: 11rem;
+    white-space: normal;
+}
+
 /* Operations — DDR dashboard (/modern/operations/ddr) */
 .modern-operations-ddr {
     padding-bottom: 2rem;
