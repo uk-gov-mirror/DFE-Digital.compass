@@ -1,0 +1,15 @@
+@model Compass.ViewModels.Modern.RisksByTierRiskRow
+@{
+  var risk = Model;
+}
+<button type="button"
+        class="govuk-link govuk-link--no-visited-state govuk-!-font-weight-bold rbt-risk-title-btn"
+        data-rbt-risk-id="@risk.Id"
+        aria-label="View details for @risk.Title">
+  @risk.Title
+</button>
+<div class="govuk-hint govuk-!-margin-bottom-0" style="font-size:0.875rem;">@risk.Reference</div>
+@if (risk.IsClosed)
+{
+  <span class="dfe-f-badge dfe-f-badge--small">Closed</span>
+}

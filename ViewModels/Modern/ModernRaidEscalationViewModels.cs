@@ -127,6 +127,7 @@ public sealed class ModernRaidEscalationReviewViewModel
     public string RiskDetailUrl { get; init; } = "#";
     public string ListReturnUrl { get; init; } = "";
     public string ListReturnTab { get; init; } = "escalations";
+    public bool IsEscalation { get; init; } = true;
 
     /// <summary>Active <strong>operational</strong> (non-proposed) tiers for “reject — set band” select.</summary>
     public IReadOnlyList<ModernRaidEscalationRejectTierOption> RejectTierOptions { get; init; } =

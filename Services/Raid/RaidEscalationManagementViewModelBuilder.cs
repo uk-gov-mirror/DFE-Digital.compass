@@ -37,13 +37,13 @@ public static class RaidEscalationManagementViewModelBuilder
 
     private static string FormatRiskTierChangeSummary(RaidEscalationTierChangeRequest r, IReadOnlyList<RiskTier> activeTiers)
     {
-        var toName = r.ToRiskTier?.Name ?? "Tier";
-        if (r.FromRiskTier == null)
+        var from = r.FromRiskTier ?? activeTiers.FirstOrDefault(t => t.Id == r.FromRiskTierId);
+        var to = r.ToRiskTier ?? activeTiers.FirstOrDefault(t => t.Id == r.ToRiskTierId);
+        var toName = to?.Name ?? "Tier";
+        if (from == null)
             return $"Proposed: {toName}";
-        var from = r.FromRiskTier;
-        var to = r.ToRiskTier;
-        if (from == null || to == null)
-            return $"Proposed: {toName}";
+        if (to == null)
+            return $"Change from {from.Name}";
         if (RiskTierGovernance.IsEscalation(from, to, activeTiers))
             return $"Escalate to {toName}";
         if (RiskTierGovernance.ResolveLevel(to, activeTiers) > RiskTierGovernance.ResolveLevel(from, activeTiers))
@@ -101,56 +101,82 @@ public static class RaidEscalationManagementViewModelBuilder
             .Take(50)
             .ToList();
 
-        var riskIdsWithPendingTierRequest = await db.RaidEscalationTierChangeRequests.AsNoTracking()
-            .Where(x => x.RecordType == "risk" && x.Status == "pending" && x.RiskId != null)
-            .Select(x => x.RiskId!.Value)
-            .Distinct()
+        var pendingReqsRaw = await db.RaidEscalationTierChangeRequests.AsNoTracking()
+            .Where(x => x.RecordType == "risk" && x.RiskId != null)
+            .Include(x => x.Risk)
+            .Include(x => x.FromRiskTier)
+            .Include(x => x.ToRiskTier)
+            .Include(x => x.SubmittedByUser)
+            .OrderByDescending(x => x.SubmittedAt)
             .ToListAsync(cancellationToken);
 
-        var proposedRisks = await db.Risks.AsNoTracking()
-            .Include(r => r.RiskTier)
-            .Include(r => r.OwnerUser)
-            .Where(r => !r.IsDeleted && r.ClosedDate == null)
-            .Where(r => r.RiskTier != null && (r.RiskTier.IsProposedTier
-                || (riskIdsWithPendingTierRequest.Count > 0 && riskIdsWithPendingTierRequest.Contains(r.Id))))
-            .OrderByDescending(r => r.UpdatedAt)
-            .ToListAsync(cancellationToken);
+        var pendingReqs = pendingReqsRaw
+            .Where(x => string.Equals(x.Status, "pending", StringComparison.OrdinalIgnoreCase))
+            .Where(x => x.Risk != null && !x.Risk.IsDeleted && x.Risk.ClosedDate == null)
+            .ToList();
 
-        var proposedRiskIds = proposedRisks.Select(r => r.Id).ToList();
-        var pendingReqs = proposedRiskIds.Count == 0
-            ? new List<RaidEscalationTierChangeRequest>()
-            : await db.RaidEscalationTierChangeRequests.AsNoTracking()
-                .Where(x => x.Status == "pending" && x.RiskId != null && proposedRiskIds.Contains(x.RiskId.Value))
-                .Include(x => x.Risk)
-                .Include(x => x.FromRiskTier)
-                .Include(x => x.ToRiskTier)
-                .Include(x => x.SubmittedByUser)
-                .OrderByDescending(x => x.SubmittedAt)
-                .ToListAsync(cancellationToken);
-
-        // Latest pending request per risk (submitted time). Used for list row + id for Operations action URL.
         var latestPendingByRiskId = pendingReqs
             .GroupBy(x => x.RiskId!.Value)
             .ToDictionary(
                 g => g.Key,
                 g => g.OrderByDescending(x => x.SubmittedAt).First());
 
-        static bool ClassifyEscalation(
-            Risk risk,
-            RaidEscalationTierChangeRequest? req,
+        var pendingRiskIds = latestPendingByRiskId.Keys.ToHashSet();
+
+        var latestApprovedByRiskId = latestApprovedByRisk
+            .Where(x => x.RiskId.HasValue)
+            .ToDictionary(x => x.RiskId!.Value);
+
+        var queueRisks = await db.Risks.AsNoTracking()
+            .Include(r => r.RiskTier)
+            .Include(r => r.OwnerUser)
+            .Where(r => !r.IsDeleted && r.ClosedDate == null)
+            .Where(r => r.RiskTier != null && (r.RiskTier!.IsProposedTier || pendingRiskIds.Contains(r.Id)))
+            .OrderByDescending(r => r.UpdatedAt)
+            .ToListAsync(cancellationToken);
+
+        static RiskTier? ResolveTier(RiskTier? tier, int? tierId, IReadOnlyList<RiskTier> tiers) =>
+            tier ?? (tierId is int id ? tiers.FirstOrDefault(t => t.Id == id) : null);
+
+        static string TierLabel(RiskTier? tier, int? tierId, IReadOnlyList<RiskTier> tiers) =>
+            ResolveTier(tier, tierId, tiers)?.Name ?? "—";
+
+        static bool IsRequestEscalation(
+            RaidEscalationTierChangeRequest req,
             IReadOnlyList<RiskTier> tiers)
         {
-            if (req?.FromRiskTier != null && req.ToRiskTier != null)
-                return RiskTierGovernance.IsEscalation(req.FromRiskTier, req.ToRiskTier, tiers);
-            if (req?.ToRiskTier != null && risk.RiskTier != null)
-                return RiskTierGovernance.IsEscalation(risk.RiskTier, req.ToRiskTier, tiers);
+            var from = ResolveTier(req.FromRiskTier, req.FromRiskTierId, tiers);
+            var to = ResolveTier(req.ToRiskTier, req.ToRiskTierId, tiers);
+            if (from == null || to == null)
+                return true;
+            return RiskTierGovernance.IsEscalation(from, to, tiers);
+        }
+
+        static bool ClassifyQueueRow(
+            Risk risk,
+            RaidEscalationTierChangeRequest? req,
+            RaidEscalationTierChangeRequest? lastApproved,
+            IReadOnlyList<RiskTier> tiers)
+        {
+            if (req != null)
+                return IsRequestEscalation(req, tiers);
+
+            if (risk.RiskTier is { IsProposedTier: true } proposed)
+            {
+                var from = ResolveTier(lastApproved?.FromRiskTier, lastApproved?.FromRiskTierId, tiers);
+                if (from != null)
+                    return RiskTierGovernance.IsEscalation(from, proposed, tiers);
+            }
+
             return true;
         }
 
-        var pendingRows = proposedRisks
+        var pendingRows = queueRisks
             .Select(r =>
             {
                 latestPendingByRiskId.TryGetValue(r.Id, out var req);
+                latestApprovedByRiskId.TryGetValue(r.Id, out var lastApproved);
+
                 var requestedBy = req != null
                     ? DisplayUser(req.SubmittedByUser)
                     : (r.OwnerUser != null ? (r.OwnerUser.Name ?? r.OwnerUser.Email) : (r.OwnerEmail ?? "Unknown"));
@@ -165,9 +191,15 @@ public static class RaidEscalationManagementViewModelBuilder
                     ? FormatRiskTierChangeSummary(req, activeTiers)
                     : $"In proposed tier: {r.RiskTier?.Name ?? "Proposed"}";
 
-                var currentTierLabel = req?.FromRiskTier?.Name ?? r.RiskTier?.Name ?? "—";
-                var proposedTierLabel = req?.ToRiskTier?.Name ?? "—";
-                var isEscalation = ClassifyEscalation(r, req, activeTiers);
+                var fromTierLabel = req != null
+                    ? TierLabel(req.FromRiskTier, req.FromRiskTierId, activeTiers)
+                    : TierLabel(lastApproved?.FromRiskTier, lastApproved?.FromRiskTierId, activeTiers);
+
+                var proposedTierLabel = req != null
+                    ? TierLabel(req.ToRiskTier, req.ToRiskTierId, activeTiers)
+                    : (r.RiskTier?.Name ?? "—");
+
+                var isEscalation = ClassifyQueueRow(r, req, lastApproved, activeTiers);
 
                 return new ModernRaidEscalationPendingRow(
                     req?.Id,
@@ -176,7 +208,7 @@ public static class RaidEscalationManagementViewModelBuilder
                     $"R-{r.Id:D4}",
                     r.Title,
                     changeLabel,
-                    currentTierLabel,
+                    fromTierLabel,
                     proposedTierLabel,
                     isEscalation,
                     requestedBy,

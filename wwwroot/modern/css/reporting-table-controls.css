@@ -1,0 +1,62 @@
+/* Full-width expand and zoom for modern reporting tables */
+.mr-report-table-region {
+  margin-bottom: 0;
+}
+
+.mr-report-table-region .mr-report-table-toolbar {
+  border: 1px solid var(--dfe-f-colour-grey-3, #b1b4b6);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--dfe-f-colour-grey-5, #f3f2f1);
+}
+
+.mr-report-table-region .mr-table-stack {
+  border: 1px solid var(--dfe-f-colour-grey-3, #b1b4b6);
+  border-radius: 0 0 4px 4px;
+}
+
+.mr-report-table-region .mr-report-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: min(70vh, 720px);
+}
+
+.mr-report-table-region--fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: #fff;
+  padding: 20px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  margin: 0 !important;
+}
+
+.mr-report-table-region--fullscreen .mr-report-table-toolbar {
+  flex-shrink: 0;
+}
+
+.mr-report-table-region--fullscreen .mr-table-stack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mr-report-table-region--fullscreen .mr-report-table-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+
+.mr-report-table-region--fullscreen .dfe-f-table-wrapper {
+  flex: 1;
+  min-height: 0;
+}
