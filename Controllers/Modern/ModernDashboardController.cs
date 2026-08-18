@@ -51,7 +51,7 @@ public class ModernDashboardController : Controller
             {
                 _logger.LogWarning("Modern dashboard: No user email found");
                 TempData["ErrorMessage"] = "Unable to identify the current user.";
-                return View("~/Views/Modern/Dashboard/Index.cshtml", new HomeDashboardViewModel());
+                return View(new HomeDashboardViewModel());
             }
 
             var currentUser = await _context.Users
@@ -61,7 +61,7 @@ public class ModernDashboardController : Controller
             {
                 _logger.LogWarning("Modern dashboard: User not found in database for email: {Email}", userEmail);
                 TempData["ErrorMessage"] = "User account not found. Please contact an administrator.";
-                return View("~/Views/Modern/Dashboard/Index.cshtml", new HomeDashboardViewModel());
+                return View(new HomeDashboardViewModel());
             }
 
             if (!string.IsNullOrEmpty(testRole) && _environment.IsDevelopment())
@@ -132,13 +132,13 @@ public class ModernDashboardController : Controller
             ViewBag.DashboardServiceRegisterProductIdByCmdbKey = null;
 
             ViewBag.MainNavSection = "home";
-            return View("~/Views/Modern/Dashboard/Index.cshtml", viewModel);
+            return View(viewModel);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error loading modern dashboard");
             TempData["ErrorMessage"] = "An error occurred while loading the dashboard.";
-            return View("~/Views/Modern/Dashboard/Index.cshtml", new HomeDashboardViewModel());
+            return View(new HomeDashboardViewModel());
         }
     }
 

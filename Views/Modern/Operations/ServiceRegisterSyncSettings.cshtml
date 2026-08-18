@@ -95,6 +95,44 @@
         <div id="fips-sync-panel-bulk" class="dfe-f-toggle__content">
           <div class="dfe-f-toggle__body">
             <p class="govuk-body-s govuk-!-margin-bottom-3" style="color:#505a5f;">Update every matching FIPS product from CMDB. Applies sync rules below. Product categories are not updated — manage those separately in Compass.</p>
+            @if (Model.DailySyncEnabled)
+            {
+                <p class="govuk-body-s govuk-!-margin-bottom-3" style="color:#505a5f;">This also runs automatically every day at @Model.DailySyncScheduleDisplay. A summary is emailed to @(Model.DailySyncSummaryEmail).</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.LastBulkSyncAtDisplay))
+            {
+                <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-4">
+                    <div class="govuk-summary-list__row">
+                        <dt class="govuk-summary-list__key">Last run</dt>
+                        <dd class="govuk-summary-list__value">@Model.LastBulkSyncAtDisplay</dd>
+                    </div>
+                    <div class="govuk-summary-list__row">
+                        <dt class="govuk-summary-list__key">Run by</dt>
+                        <dd class="govuk-summary-list__value">@Model.LastBulkSyncByDisplay</dd>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.LastBulkSyncStatusDisplay))
+                    {
+                        <div class="govuk-summary-list__row">
+                            <dt class="govuk-summary-list__key">Result</dt>
+                            <dd class="govuk-summary-list__value">
+                                @{
+                                    var status = Model.LastBulkSyncStatusDisplay!;
+                                    var badgeClass = status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                                        ? "dfe-f-badge dfe-f-badge--small dfe-f-badge--green"
+                                        : status.Equals("Failed", StringComparison.OrdinalIgnoreCase)
+                                            ? "dfe-f-badge dfe-f-badge--small dfe-f-badge--red"
+                                            : "dfe-f-badge dfe-f-badge--small";
+                                }
+                                <span class="@badgeClass">@status</span>
+                            </dd>
+                        </div>
+                    }
+                </dl>
+            }
+            else
+            {
+                <p class="govuk-body-s govuk-!-margin-bottom-3" style="color:#505a5f;">No bulk sync has been recorded yet.</p>
+            }
             <form id="fips-cmdb-bulk-sync-antiforgery" method="post" class="govuk-!-margin-bottom-0" aria-hidden="true">
               @Html.AntiForgeryToken()
             </form>

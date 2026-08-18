@@ -534,6 +534,7 @@ public sealed partial class EnvironmentSyncService
     target.ActualDeliveryDate = src.ActualDeliveryDate;
     target.IsFlagship = src.IsFlagship;
     target.IsAiInitiative = src.IsAiInitiative;
+    target.ShowInFips = src.ShowInFips;
     target.RagStatusLookupId = RemapNullable(src.RagStatusLookupId, ragMap);
     target.RagStatus = src.RagStatus;
     target.RagJustification = src.RagJustification;

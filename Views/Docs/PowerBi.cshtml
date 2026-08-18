@@ -45,7 +45,7 @@
 <ol class="govuk-list govuk-list--number">
     <li>Request a read-only key from the <a class="govuk-link" href="@Url.Action("Request", "DocsDeveloperApi")">API keys developer portal</a> (choose environment DEV, TEST or PROD and a short project name — keys are named like <code>PROD-RO-powerbi-raid</code>).</li>
     <li>Or ask a COMPASS administrator to create a token at <code>/modern/admin/api-tokens</code> if you need custom permissions reviewed manually.</li>
-    <li>Grant only the scopes you need. For most PowerBI workloads this is <code>read</code> on <code>Risks</code>, <code>Actions</code>, <code>Issues</code>, <code>Milestones</code>, <code>PerformanceMetrics</code>, <code>EnterpriseMetrics</code> and <code>AdminLookups</code>.</li>
+    <li>Grant only the scopes you need. For most PowerBI workloads this is <code>read</code> on <code>WorkItems</code>, <code>Risks</code>, <code>Issues</code>, <code>Milestones</code>, <code>PerformanceMetrics</code>, <code>EnterpriseMetrics</code> and <code>AdminLookups</code>.</li>
     <li>Copy the token immediately &mdash; it cannot be retrieved later.</li>
     <li>Store it in a secret manager (Azure Key Vault, the PowerBI service workspace's secrets, or your organisation's secrets store). Do not paste it into <code>.pbix</code> files committed to source control.</li>
 </ol>
@@ -118,6 +118,7 @@ in
         </tr>
     </thead>
     <tbody class="govuk-table__body">
+        <tr class="govuk-table__row"><th scope="row" class="govuk-table__header">Work items</th><td class="govuk-table__cell"><code>GET /WorkItems</code></td><td class="govuk-table__cell">Delivery dimension table (<code>Project.Id</code>). Filter: <code>status</code>, <code>businessAreaId</code>, <code>phaseId</code>, <code>ragStatusId</code>, <code>q</code>. Paginated.</td></tr>
         <tr class="govuk-table__row"><th scope="row" class="govuk-table__header">Risks</th><td class="govuk-table__cell"><code>GET /risks</code></td><td class="govuk-table__cell">Filter: <code>fipsId</code>, <code>status</code>, <code>minScore</code>. Paginated.</td></tr>
         <tr class="govuk-table__row"><th scope="row" class="govuk-table__header">Issues</th><td class="govuk-table__cell"><code>GET /issues</code></td><td class="govuk-table__cell">Filter: <code>fipsId</code>, <code>status</code>, <code>severity</code>. Paginated.</td></tr>
         <tr class="govuk-table__row"><th scope="row" class="govuk-table__header">Actions</th><td class="govuk-table__cell"><code>GET /actions</code></td><td class="govuk-table__cell">Filter: <code>status</code>, <code>ownerEmail</code>, <code>projectId</code>. Paginated.</td></tr>
@@ -183,9 +184,10 @@ in
 </code></pre>
 
 <p class="govuk-body">Use it for any endpoint:</p>
-<pre class="developers-code-block"><code>Risks    = fnCompassGetAll("risks",    [ status = "open" ]),
-Actions  = fnCompassGetAll("actions",  [ status = "open" ]),
-Services = fnCompassGetAll("service-register", null)
+<pre class="developers-code-block"><code>WorkItems = fnCompassGetAll("WorkItems", [ status = "Active" ]),
+Risks     = fnCompassGetAll("Risks",    [ status = "open" ]),
+Issues    = fnCompassGetAll("Issues",  [ status = "open" ]),
+Services  = fnCompassGetAll("ServiceRegister/products", null)
 </code></pre>
 
 <hr class="govuk-section-break govuk-section-break--m govuk-section-break--visible">

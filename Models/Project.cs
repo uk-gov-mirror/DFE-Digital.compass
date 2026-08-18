@@ -35,6 +35,11 @@ public class Project
     [Required]
     public bool IsAiInitiative { get; set; } = false;
 
+    /// <summary>
+    /// When true, this work item is shown in FIPS and can be found by the FIPS service.
+    /// </summary>
+    public bool ShowInFips { get; set; } = false;
+
     // RAG Status - using foreign key to RagStatusLookup
     public int? RagStatusLookupId { get; set; }
     [ForeignKey(nameof(RagStatusLookupId))]

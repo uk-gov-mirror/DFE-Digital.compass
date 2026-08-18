@@ -184,18 +184,16 @@ public class ApiTokenService : IApiTokenService
             return false;
         }
 
-        var permission = token.Permissions.FirstOrDefault(p => p.Resource == resource);
-        if (permission == null)
-        {
-            return false;
-        }
+        var permission = token.Permissions.FirstOrDefault(p =>
+            string.Equals(p.Resource, resource, StringComparison.OrdinalIgnoreCase));
 
-        return operation.ToLower() switch
+        return operation.ToLowerInvariant() switch
         {
-            "read" or "get" => permission.CanRead,
-            "create" or "post" => permission.CanCreate,
-            "update" or "put" or "patch" => permission.CanUpdate,
-            "delete" => permission.CanDelete,
+            "read" or "get" => permission?.CanRead == true
+                || (permission == null && Compass.Services.Api.ApiTokenResourceCatalog.GrantsRead(token.Permissions, resource)),
+            "create" or "post" => permission?.CanCreate == true,
+            "update" or "put" or "patch" => permission?.CanUpdate == true,
+            "delete" => permission?.CanDelete == true,
             _ => false
         };
     }

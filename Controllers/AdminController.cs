@@ -2013,7 +2013,7 @@ public class AdminController : Controller
 
         var permissions = await _apiTokenService.GetPermissionsAsync(id);
 
-        var resources = new[] { "Risks", "Issues", "Actions", "Milestones", "PerformanceMetrics", "EnterpriseMetrics", "FunctionalStandards", "AccessibilityIssues", "SurveysAdmin", "UserSatisfactionQuestions", "UserSatisfactionResponses", "DdtStandards" };
+        var resources = Compass.Services.Api.ApiTokenResourceCatalog.Resources;
         
         ViewBag.Token = token;
         ViewBag.Permissions = permissions;
@@ -2031,7 +2031,7 @@ public class AdminController : Controller
         {
             var permissionsDict = new Dictionary<string, (bool read, bool create, bool update, bool delete)>();
 
-            foreach (var resource in new[] { "Risks", "Issues", "Actions", "Milestones", "PerformanceMetrics", "EnterpriseMetrics", "FunctionalStandards", "AccessibilityIssues", "SurveysAdmin", "UserSatisfactionQuestions", "UserSatisfactionResponses", "DdtStandards" })
+            foreach (var resource in Compass.Services.Api.ApiTokenResourceCatalog.Resources)
             {
                 var read = permissions.ContainsKey($"{resource}_read") && permissions[$"{resource}_read"] == "on";
                 var create = permissions.ContainsKey($"{resource}_create") && permissions[$"{resource}_create"] == "on";

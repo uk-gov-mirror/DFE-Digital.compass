@@ -10622,6 +10622,9 @@ namespace Compass.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("ShowInFips")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime?>("StartDate")
                         .HasColumnType("datetime2");
 
@@ -10683,6 +10686,8 @@ namespace Compass.Migrations
                     b.HasIndex("RagStatusLookupId");
 
                     b.HasIndex("RiskAppetiteLookupId");
+
+                    b.HasIndex("ShowInFips");
 
                     b.HasIndex("StartDate");
 

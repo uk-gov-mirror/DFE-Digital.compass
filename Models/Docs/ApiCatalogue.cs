@@ -16,6 +16,149 @@ public static class ApiCatalogue
     private static ApiEndpointSection[] BuildSections() => new ApiEndpointSection[]
     {
         new(
+            Id: "work-items",
+            Title: "Work items",
+            Description: "Delivery work items (the Project table behind /modern/work). Use this as the dimension table for RAID, milestones and monthly reporting. Status values are Active, Paused, Completed and Cancelled.",
+            Endpoints: new ApiEndpointDoc[]
+            {
+                new(
+                    Id: "work-items-list",
+                    Method: "GET",
+                    Path: "/api/v1/WorkItems",
+                    Scope: "WorkItems:read",
+                    Description: "Paged list of work items with RAG, phase, business area, priority, portfolio, primary contact, tags and FIPS visibility.",
+                    QueryParams: new[]
+                    {
+                        ("status", "string", "Filter by status: Active, Paused, Completed, Cancelled"),
+                        ("businessAreaId", "integer", "Filter by business area lookup id"),
+                        ("phaseId", "integer", "Filter by phase lookup id"),
+                        ("ragStatusId", "integer", "Filter by RAG status lookup id"),
+                        ("priorityId", "integer", "Filter by delivery priority lookup id"),
+                        ("portfolioId", "integer", "Filter by organisational group (portfolio) id"),
+                        ("flagship", "boolean", "true / false — flagship work only"),
+                        ("showInFips", "string", "true / yes / 1 or false / no / 0 — work marked to appear in FIPS"),
+                        ("q", "string", "Free-text search across title and project code"),
+                        ("page", "integer", "Page number (default 1)"),
+                        ("pageSize", "integer", "Results per page (default 50, max 100)")
+                    },
+                    ResponseShape: "Paged envelope: { data: [], pagination: { currentPage, pageSize, totalPages, totalRecords } }",
+                    ResponseExample: """
+{
+  "data": [
+    {
+      "id": 412,
+      "projectCode": "DDTDEL-0412",
+      "title": "Teacher reference numbers",
+      "aim": "Give teachers a single identifier across services",
+      "status": "Active",
+      "startDate": "2025-04-01T00:00:00Z",
+      "targetEndDate": "2027-03-31T00:00:00Z",
+      "isFlagship": true,
+      "showInFips": true,
+      "ragStatus": { "id": 2, "name": "Amber" },
+      "phase": { "id": 3, "name": "Private beta" },
+      "businessArea": { "id": 5, "name": "Teacher Services" },
+      "priority": { "id": 1, "name": "P1" },
+      "portfolio": { "id": 8, "name": "Teacher Services portfolio" },
+      "primaryContact": { "id": 91, "name": "Alex Morgan", "email": "alex.morgan@education.gov.uk" },
+      "tags": [ { "id": 4, "name": "Workforce" } ],
+      "createdAt": "2025-03-12T09:00:00Z",
+      "updatedAt": "2026-08-01T14:22:00Z"
+    }
+  ],
+  "pagination": { "currentPage": 1, "pageSize": 50, "totalPages": 9, "totalRecords": 412 }
+}
+"""),
+                new(
+                    Id: "work-items-get",
+                    Method: "GET",
+                    Path: "/api/v1/WorkItems/{id}",
+                    Scope: "WorkItems:read",
+                    Description: "Single work item including contacts, directorates, tags, linked products, FIPS visibility, RAID/milestone counts and the latest monthly update summary.",
+                    RouteParams: new[] { ("id", "integer", "Work item id (Project.Id)") },
+                    ResponseExample: """
+{
+  "id": 412,
+  "projectCode": "DDTDEL-0412",
+  "title": "Teacher reference numbers",
+  "aim": "Give teachers a single identifier across services",
+  "problemStatement": "Teachers currently hold multiple identifiers across DfE systems.",
+  "status": "Active",
+  "isFlagship": true,
+  "showInFips": true,
+  "ragStatus": { "id": 2, "name": "Amber" },
+  "phase": { "id": 3, "name": "Private beta" },
+  "contacts": [
+    { "id": 18, "role": "Primary contact", "name": "Alex Morgan", "email": "alex.morgan@education.gov.uk" }
+  ],
+  "linkedProducts": [
+    { "documentId": "0c64e10b-…", "fipsId": "FIPS-2491", "title": "Apply for a teacher reference" }
+  ],
+  "counts": { "openRisks": 3, "openIssues": 1, "milestones": 6 },
+  "latestMonthlyUpdate": { "id": 8801, "year": 2026, "month": 7, "submittedAt": "2026-08-04T10:12:00Z" }
+}
+"""),
+                new(
+                    Id: "work-items-create",
+                    Method: "POST",
+                    Path: "/api/v1/WorkItems",
+                    Scope: "WorkItems:create",
+                    Description: "Create a work item. A DDTDEL-nnnn project code is assigned server-side. Status defaults to Active.",
+                    BodyExample: """
+{
+  "title": "Teacher reference numbers",
+  "aim": "Give teachers a single identifier across services",
+  "problemStatement": "Teachers currently hold multiple identifiers across DfE systems.",
+  "status": "Active",
+  "startDate": "2025-04-01T00:00:00Z",
+  "targetEndDate": "2027-03-31T00:00:00Z",
+  "businessAreaId": 5,
+  "portfolioId": 8,
+  "phaseId": 3,
+  "priorityId": 1,
+  "ragStatusId": 2,
+  "primaryContactUserId": 91,
+  "isFlagship": true,
+  "showInFips": true,
+  "tagIds": [4]
+}
+""",
+                    ResponseExample: """
+{
+  "id": 413,
+  "projectCode": "DDTDEL-0413",
+  "title": "Teacher reference numbers",
+  "status": "Active",
+  "createdAt": "2026-08-18T09:00:00Z"
+}
+"""),
+                new(
+                    Id: "work-items-update",
+                    Method: "PUT",
+                    Path: "/api/v1/WorkItems/{id}",
+                    Scope: "WorkItems:update",
+                    Description: "Partial update — send only the fields you want to change.",
+                    RouteParams: new[] { ("id", "integer", "Work item id") },
+                    BodyExample: """
+{
+  "status": "Paused",
+  "ragStatusId": 3,
+  "isFlagship": false,
+  "showInFips": true
+}
+""",
+                    ResponseExample: "{ \"id\": 412, \"status\": \"Paused\", \"updatedAt\": \"2026-08-18T09:15:00Z\" }"),
+                new(
+                    Id: "work-items-delete",
+                    Method: "DELETE",
+                    Path: "/api/v1/WorkItems/{id}",
+                    Scope: "WorkItems:delete",
+                    Description: "Soft-deletes a work item (IsDeleted flag). Delete is not available through self-service token requests.",
+                    RouteParams: new[] { ("id", "integer", "Work item id") },
+                    ResponseExample: "{ \"message\": \"Work item deleted\" }")
+            }),
+
+        new(
             Id: "risks",
             Title: "Risks",
             Description: "Operational risks captured against work items and FIPS products. Risk score is auto-computed as impact × likelihood.",

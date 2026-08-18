@@ -1,4 +1,6 @@
+using Compass.Data;
 using Compass.Models.Fips;
+using Microsoft.EntityFrameworkCore;
 
 namespace Compass.Services.Fips;
 
@@ -77,5 +79,28 @@ public static class FipsCmdbSyncDefaultRules
         }
 
         return rules;
+    }
+
+    public static async Task EnsureSeededAsync(CompassDbContext db, CancellationToken cancellationToken)
+    {
+        if (!await db.FipsCmdbSyncRules.AnyAsync(cancellationToken))
+        {
+            var now = DateTime.UtcNow;
+            foreach (var rule in CreateSeedRules(now))
+                db.FipsCmdbSyncRules.Add(rule);
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        var exists = await db.FipsCmdbSyncRules.AnyAsync(
+            r => r.Action == FipsCmdbSyncRuleActions.SetEnterpriseService
+                 && r.FieldScope == FipsCmdbSyncRuleScopes.ServiceClassification
+                 && r.Pattern == "Business Service",
+            cancellationToken);
+        if (exists)
+            return;
+
+        db.FipsCmdbSyncRules.Add(CreateBusinessServiceEnterpriseRule(DateTime.UtcNow));
+        await db.SaveChangesAsync(cancellationToken);
     }
 }

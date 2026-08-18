@@ -541,6 +541,8 @@ builder.Services.AddScoped<ICompassNotificationSettingsService, CompassNotificat
 builder.Services.AddScoped<IWorkReportingNotificationService, WorkReportingNotificationService>();
 builder.Services.AddScoped<IWorkItemNotificationService, WorkItemNotificationService>();
 builder.Services.AddHostedService<WorkReportingNotificationHostedService>();
+builder.Services.AddScoped<Compass.Services.Fips.IFipsCmdbDailySyncService, Compass.Services.Fips.FipsCmdbDailySyncService>();
+builder.Services.AddHostedService<FipsCmdbDailySyncHostedService>();
 builder.Services.AddScoped<IGlobalFeatureToggleService, GlobalFeatureToggleService>();
 builder.Services.AddScoped<Compass.Filters.DemandFeatureGateFilter>();
 builder.Services.AddScoped<Compass.Filters.StandardsFeatureGateFilter>();
