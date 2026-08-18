@@ -15,6 +15,24 @@ public sealed class FipsCmdbSyncProgressUpdate
     public int? Total { get; init; }
 }
 
+public sealed class FipsCmdbSyncedProduct
+{
+    public Guid Id { get; init; }
+    public string Title { get; init; } = "";
+    public CMDBProductStatus Status { get; init; }
+}
+
+public sealed class FipsCmdbBulkSyncRunInfo
+{
+    public DateTime StartedAtUtc { get; init; }
+    public DateTime? CompletedAtUtc { get; init; }
+    public string Status { get; init; } = "";
+    public string? InitiatedBy { get; init; }
+    public int ProductsCreated { get; init; }
+    public int ProductsUpdated { get; init; }
+    public int ErrorsEncountered { get; init; }
+}
+
 public sealed class FipsCmdbProductSyncResult
 {
     public int Created { get; set; }
@@ -27,6 +45,15 @@ public sealed class FipsCmdbProductSyncResult
     public int StatusSetByRules { get; set; }
     public int Errors { get; set; }
     public List<string> ErrorSamples { get; } = new();
+    /// <summary>Products created in this run (after rules). Use <see cref="NewProductsNeedingInfo"/> for entries still New.</summary>
+    public List<FipsCmdbSyncedProduct> CreatedProducts { get; } = new();
+    /// <summary>Count of service-register rows in New status after this run.</summary>
+    public int NewStatusCount { get; set; }
+    /// <summary>True when another bulk CMDB sync is already in progress.</summary>
+    public bool AlreadyRunning { get; set; }
+
+    public IEnumerable<FipsCmdbSyncedProduct> NewProductsNeedingInfo =>
+        CreatedProducts.Where(p => p.Status == CMDBProductStatus.New);
 }
 
 public sealed class FipsCmdbSingleProductSyncResult
@@ -61,6 +88,9 @@ public interface IFipsCmdbProductSyncService
     Task<FipsCmdbProductResetResult> ResetAllProductsForCmdbResyncAsync(
         string triggeredByEmail,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Most recent bulk CMDB → Compass run, including in-progress.</summary>
+    Task<FipsCmdbBulkSyncRunInfo?> GetLastBulkRunAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed class FipsCmdbProductResetResult

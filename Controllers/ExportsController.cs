@@ -427,7 +427,7 @@ public class ExportsController : Controller
             "ActivityType", "RiskAppetite",
             "Portfolio_OrganizationalGroup", "PrimaryContact",
             "Status", "StatusChangeReason",
-            "IsFlagship", "IsAiInitiative", "IsMultiDepartmentProject", "OtherDepartmentsJson",
+            "IsFlagship", "IsAiInitiative", "ShowInFips", "IsMultiDepartmentProject", "OtherDepartmentsJson",
             "BusinessCaseApproval", "TotalPermFte", "TotalMspFte",
             "PipelineDemandRequestId", "ServiceUsers", "IsInternal", "IsExternal",
             "IsSubjectToSpendControl", "CreationMethod", "CreatedAt", "UpdatedAt",
@@ -510,6 +510,7 @@ public class ExportsController : Controller
             SetCell(ws, row, ref col, p.StatusChangeReason);
             SetCell(ws, row, ref col, p.IsFlagship);
             SetCell(ws, row, ref col, p.IsAiInitiative);
+            SetCell(ws, row, ref col, p.ShowInFips);
             SetCell(ws, row, ref col, p.IsMultiDepartmentProject);
             SetCell(ws, row, ref col, p.OtherDepartments);
             SetCell(ws, row, ref col, p.BusinessCaseApproval);

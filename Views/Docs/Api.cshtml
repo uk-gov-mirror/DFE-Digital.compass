@@ -18,7 +18,7 @@
     <span class="govuk-caption-xl">Reference</span>
     <h1 class="govuk-heading-xl govuk-!-margin-bottom-2">API reference</h1>
     <p class="govuk-body-l govuk-!-margin-bottom-0">
-        REST endpoints for risks, issues, milestones, performance metrics,
+        REST endpoints for work items, risks, issues, milestones, performance metrics,
         service register and standards. Each endpoint has copy-ready code
         snippets &mdash; try them live in the
         <a class="govuk-link" href="@apiExplorerUrl">API explorer</a>.
@@ -43,6 +43,31 @@
         Delete access is not available through self-service; contact
         <a class="govuk-link" href="mailto:design.ops@education.gov.uk">design.ops@education.gov.uk</a> if required.
     </p>
+
+    <h3 class="govuk-heading-m">Resources</h3>
+    <p class="govuk-body">Every resource below is implemented at <code>/api/v1</code> and documented in full further down this page. Work items are the delivery dimension table — RAID, milestones and monthly reporting hang off <code>Project.Id</code>.</p>
+    <table class="govuk-table">
+        <caption class="govuk-table__caption govuk-visually-hidden">API resources</caption>
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">Resource</th>
+                <th scope="col" class="govuk-table__header">Scope</th>
+                <th scope="col" class="govuk-table__header">List endpoint</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            @foreach (var group in sections.Where(s => s.Endpoints.Count > 0 && s.Id != "health"))
+            {
+                var list = group.Endpoints.FirstOrDefault(e => e.Method == "GET" && e.RouteParams is null or { Count: 0 })
+                           ?? group.Endpoints[0];
+                <tr class="govuk-table__row">
+                    <th scope="row" class="govuk-table__header"><a class="govuk-link" href="#@group.Id">@group.Title</a></th>
+                    <td class="govuk-table__cell"><code>@list.Scope</code></td>
+                    <td class="govuk-table__cell"><code>@list.Method @list.Path</code></td>
+                </tr>
+            }
+        </tbody>
+    </table>
 
     <div class="api-base-urls">
         <div>

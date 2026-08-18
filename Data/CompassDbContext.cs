@@ -2330,6 +2330,9 @@ public partial class CompassDbContext : DbContext
             .HasIndex(p => p.IsFlagship);
 
         modelBuilder.Entity<Project>()
+            .HasIndex(p => p.ShowInFips);
+
+        modelBuilder.Entity<Project>()
             .HasIndex(p => p.StartDate);
 
         modelBuilder.Entity<Project>()

@@ -1594,14 +1594,21 @@ public class ModernOperationsController : Controller
         {
             await EnsureDefaultCmdbSyncRulesAsync(ct);
             var r = await _fipsCmdbProductSync.SyncActiveServiceOfferingsAsync(CurrentUserEmail, ct);
-            TempData["Success"] =
-                $"CMDB sync finished: {r.Created} product(s) created, {r.Updated} updated. {r.StatusSetByRules} status change(s) from sync rules. " +
-                $"Skipped {r.SkippedRetired} inactive (retired) in Compass, {r.SkippedNoSysId} CMDB rows without sys_id.";
-            if (r.Errors > 0)
+            if (r.AlreadyRunning)
             {
-                TempData["Error"] =
-                    $"{r.Errors} error(s). " +
-                    (r.ErrorSamples.Count > 0 ? string.Join(" ", r.ErrorSamples) : string.Empty);
+                TempData["Error"] = "A CMDB sync is already running. Try again when it has finished.";
+            }
+            else
+            {
+                TempData["Success"] =
+                    $"CMDB sync finished: {r.Created} product(s) created, {r.Updated} updated. {r.StatusSetByRules} status change(s) from sync rules. " +
+                    $"Skipped {r.SkippedRetired} inactive (retired) in Compass, {r.SkippedNoSysId} CMDB rows without sys_id.";
+                if (r.Errors > 0)
+                {
+                    TempData["Error"] =
+                        $"{r.Errors} error(s). " +
+                        (r.ErrorSamples.Count > 0 ? string.Join(" ", r.ErrorSamples) : string.Empty);
+                }
             }
         }
         catch (Exception ex)
@@ -1644,6 +1651,17 @@ public class ModernOperationsController : Controller
                 CurrentUserEmail,
                 ct,
                 async update => { await SendEventAsync(update); });
+
+            if (syncResult.AlreadyRunning)
+            {
+                await SendEventAsync(new
+                {
+                    phase = "error",
+                    success = false,
+                    message = "A CMDB sync is already running. Try again when it has finished."
+                });
+                return;
+            }
 
             await SendEventAsync(new
             {
@@ -1866,14 +1884,7 @@ public class ModernOperationsController : Controller
             return blocked;
 
         SetNav("operations-service-register");
-        await EnsureDefaultCmdbSyncRulesAsync(ct);
-        var rules = await _db.FipsCmdbSyncRules.AsNoTracking()
-            .OrderBy(r => r.SortOrder)
-            .ThenBy(r => r.Id)
-            .ToListAsync(ct);
-        var subNav = await FipsProductListingHelper.BuildSubNavModelAsync(
-            _db, "sync", CurrentUserEmail, ct);
-        var vm = new ServiceRegisterSyncSettingsViewModel { Rules = rules, SubNav = subNav, CanSyncFromCmdb = true };
+        var vm = await BuildSyncSettingsViewModelAsync(ct);
         return View("~/Views/Modern/Operations/ServiceRegisterSyncSettings.cshtml", vm);
     }
 
@@ -1948,19 +1959,7 @@ public class ModernOperationsController : Controller
             }
         }
 
-        var rules = await _db.FipsCmdbSyncRules.AsNoTracking()
-            .OrderBy(r => r.SortOrder)
-            .ThenBy(r => r.Id)
-            .ToListAsync(ct);
-        var subNav = await FipsProductListingHelper.BuildSubNavModelAsync(
-            _db, "sync", CurrentUserEmail, ct);
-        var vm = new ServiceRegisterSyncSettingsViewModel
-        {
-            Rules = rules,
-            SubNav = subNav,
-            CanSyncFromCmdb = true,
-            LastImportResult = importResult
-        };
+        var vm = await BuildSyncSettingsViewModelAsync(ct, lastImport: importResult);
         return View("~/Views/Modern/Operations/ServiceRegisterSyncSettings.cshtml", vm);
     }
 
@@ -2022,19 +2021,7 @@ public class ModernOperationsController : Controller
             }
         }
 
-        var rules = await _db.FipsCmdbSyncRules.AsNoTracking()
-            .OrderBy(r => r.SortOrder)
-            .ThenBy(r => r.Id)
-            .ToListAsync(ct);
-        var subNav = await FipsProductListingHelper.BuildSubNavModelAsync(
-            _db, "sync", CurrentUserEmail, ct);
-        var vm = new ServiceRegisterSyncSettingsViewModel
-        {
-            Rules = rules,
-            SubNav = subNav,
-            CanSyncFromCmdb = true,
-            LastStrapiImportResult = importResult
-        };
+        var vm = await BuildSyncSettingsViewModelAsync(ct, lastStrapiImport: importResult);
         return View("~/Views/Modern/Operations/ServiceRegisterSyncSettings.cshtml", vm);
     }
 
@@ -2166,33 +2153,51 @@ public class ModernOperationsController : Controller
         return RedirectToAction(nameof(ServiceRegisterSyncSettings));
     }
 
-    private async Task EnsureDefaultCmdbSyncRulesAsync(CancellationToken cancellationToken)
-    {
-        if (!await _db.FipsCmdbSyncRules.AnyAsync(cancellationToken))
-        {
-            var now = DateTime.UtcNow;
-            foreach (var rule in FipsCmdbSyncDefaultRules.CreateSeedRules(now))
-                _db.FipsCmdbSyncRules.Add(rule);
-            await _db.SaveChangesAsync(cancellationToken);
-            return;
-        }
+    private async Task EnsureDefaultCmdbSyncRulesAsync(CancellationToken cancellationToken) =>
+        await FipsCmdbSyncDefaultRules.EnsureSeededAsync(_db, cancellationToken);
 
-        await EnsureBusinessServiceEnterpriseRuleAsync(cancellationToken);
+    private async Task<ServiceRegisterSyncSettingsViewModel> BuildSyncSettingsViewModelAsync(
+        CancellationToken ct,
+        FipsCompletionImportResult? lastImport = null,
+        FipsCompletionImportResult? lastStrapiImport = null)
+    {
+        await EnsureDefaultCmdbSyncRulesAsync(ct);
+        var rules = await _db.FipsCmdbSyncRules.AsNoTracking()
+            .OrderBy(r => r.SortOrder)
+            .ThenBy(r => r.Id)
+            .ToListAsync(ct);
+        var subNav = await FipsProductListingHelper.BuildSubNavModelAsync(
+            _db, "sync", CurrentUserEmail, ct);
+        var lastRun = await _fipsCmdbProductSync.GetLastBulkRunAsync(ct);
+        var hour = _configuration.GetValue<int>("FipsSync:DailySyncHourUk", 6);
+        if (hour is < 0 or > 23)
+            hour = 6;
+
+        return new ServiceRegisterSyncSettingsViewModel
+        {
+            Rules = rules,
+            SubNav = subNav,
+            CanSyncFromCmdb = true,
+            LastImportResult = lastImport,
+            LastStrapiImportResult = lastStrapiImport,
+            LastBulkSyncAtDisplay = lastRun == null
+                ? null
+                : UkDateTime.FormatUk(lastRun.CompletedAtUtc ?? lastRun.StartedAtUtc),
+            LastBulkSyncByDisplay = FormatBulkSyncInitiatedBy(lastRun?.InitiatedBy),
+            LastBulkSyncStatusDisplay = string.IsNullOrWhiteSpace(lastRun?.Status) ? null : lastRun.Status,
+            DailySyncEnabled = _configuration.GetValue<bool>("FipsSync:DailySyncEnabled", true),
+            DailySyncScheduleDisplay = $"{hour:00}:00 (UK)",
+            DailySyncSummaryEmail = string.IsNullOrWhiteSpace(_configuration["FipsSync:DailySyncSummaryEmail"])
+                ? "fips.service@education.gov.uk"
+                : _configuration["FipsSync:DailySyncSummaryEmail"]!.Trim()
+        };
     }
 
-    private async Task EnsureBusinessServiceEnterpriseRuleAsync(CancellationToken cancellationToken)
+    private static string FormatBulkSyncInitiatedBy(string? initiatedBy)
     {
-        var exists = await _db.FipsCmdbSyncRules.AnyAsync(
-            r => r.Action == FipsCmdbSyncRuleActions.SetEnterpriseService
-                 && r.FieldScope == FipsCmdbSyncRuleScopes.ServiceClassification
-                 && r.Pattern == "Business Service",
-            cancellationToken);
-        if (exists)
-            return;
-
-        var now = DateTime.UtcNow;
-        _db.FipsCmdbSyncRules.Add(FipsCmdbSyncDefaultRules.CreateBusinessServiceEnterpriseRule(now));
-        await _db.SaveChangesAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(initiatedBy))
+            return "Unknown";
+        return initiatedBy.Trim();
     }
 
     [HttpGet("manage-triage")]
