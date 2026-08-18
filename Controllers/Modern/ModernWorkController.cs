@@ -541,6 +541,7 @@ public partial class ModernWorkController : Controller
             RiskAppetiteLookupId = model.RiskAppetiteId,
             IsFlagship = false,
             IsAiInitiative = false,
+            ShowInFips = false,
             IsSubjectToSpendControl = model.SubjectToSpendControl,
             RagJustification = string.IsNullOrWhiteSpace(initialRagJustification) ? null : initialRagJustification.Trim(),
             PathToGreen = pathToGreenPersist,
@@ -1601,10 +1602,13 @@ public partial class ModernWorkController : Controller
             {
                 WorkItemId = id,
                 CanLink = ViewBag.CanLinkWorkServiceRegister as bool? == true,
+                CanEdit = ViewBag.CanEditWorkItem as bool? == true,
                 CanCreateServiceOffering = canCreateServiceOffering,
+                ShowInFips = work.ShowInFips,
                 Links = srLinks,
                 PickProductsUrl = Url.Action(nameof(PickServiceRegisterProducts), new { id }) ?? "",
                 LinkUrl = Url.Action(nameof(LinkServiceRegisterProduct), new { id }) ?? "",
+                SaveShowInFipsUrl = Url.Action(nameof(UpdateShowInFips), new { id }) ?? "",
             };
         }
 

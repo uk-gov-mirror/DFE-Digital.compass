@@ -110,17 +110,10 @@
         <ul class="developers-doc-nav__list developers-doc-nav__list--sub">
             <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#overview">Overview</a></li>
             <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiExplorerUrl">API explorer &rarr;</a></li>
-            <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#risks">Risks</a></li>
-            <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#issues">Issues</a></li>
-            <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#milestones">Milestones</a></li>
-            <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#performance-metrics">Performance metrics</a></li>
-            <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#enterprise-metrics">Enterprise metrics</a></li>
-            <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#functional-standards">Functional standards</a></li>
-            <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#ddt-standards">DDT standards</a></li>
-            <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#service-register">Service register</a></li>
-            <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#cms-access">CMS access requests</a></li>
-            <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#admin-lookups">Admin lookups</a></li>
-            <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#health">Health</a></li>
+            @foreach (var group in Compass.Models.Docs.ApiCatalogue.Sections)
+            {
+                <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#@group.Id">@group.Title</a></li>
+            }
             <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#lookup-keys">Admin lookup keys</a></li>
             <li class="developers-doc-nav__item"><a class="developers-doc-nav__link developers-doc-nav__link--sub" href="@apiUrl#feedback">Feedback &amp; missing endpoints</a></li>
         </ul>

@@ -8,6 +8,47 @@
 <div id="wd-service-register" class="tab-pane">
   <div class="govuk-summary-card govuk-!-margin-top-0">
     <div class="govuk-summary-card__title-wrapper">
+      <h2 class="govuk-summary-card__title">FIPS</h2>
+    </div>
+    <div class="govuk-summary-card__content">
+      @if (Model.CanEdit)
+      {
+        <form method="post" action="@Model.SaveShowInFipsUrl" class="govuk-!-margin-bottom-0">
+          @Html.AntiForgeryToken()
+          <div class="govuk-form-group govuk-!-margin-bottom-4">
+            <fieldset class="govuk-fieldset">
+              <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">
+                Show this work item in FIPS and allow it to be found in the FIPS service
+              </legend>
+              <div class="govuk-radios govuk-radios--inline" data-module="govuk-radios">
+                <div class="govuk-radios__item">
+                  <input class="govuk-radios__input" type="radio" name="showInFips" id="wd-fips-yes" value="true" @(Model.ShowInFips ? "checked" : null) />
+                  <label class="govuk-label govuk-radios__label" for="wd-fips-yes">Yes</label>
+                </div>
+                <div class="govuk-radios__item">
+                  <input class="govuk-radios__input" type="radio" name="showInFips" id="wd-fips-no" value="false" @(!Model.ShowInFips ? "checked" : null) />
+                  <label class="govuk-label govuk-radios__label" for="wd-fips-no">No</label>
+                </div>
+              </div>
+            </fieldset>
+          </div>
+          <button type="submit" class="govuk-button govuk-!-margin-bottom-0" data-module="govuk-button">Save</button>
+        </form>
+      }
+      else
+      {
+        <dl class="govuk-summary-list govuk-!-margin-bottom-0">
+          <div class="govuk-summary-list__row govuk-summary-list__row--no-actions">
+            <dt class="govuk-summary-list__key">Show this work item in FIPS and allow it to be found in the FIPS service</dt>
+            <dd class="govuk-summary-list__value">@(Model.ShowInFips ? "Yes" : "No")</dd>
+          </div>
+        </dl>
+      }
+    </div>
+  </div>
+
+  <div class="govuk-summary-card govuk-!-margin-top-6">
+    <div class="govuk-summary-card__title-wrapper">
       <h2 class="govuk-summary-card__title">Service register</h2>
     </div>
     <div class="govuk-summary-card__content">

@@ -4,6 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Compass's compiled Razor assembly is very large. Hot Reload can replace the view compiler
+         and then fail to resolve views ("The view was not found") on first request. -->
+    <HotReloadEnabled>false</HotReloadEnabled>
     <!-- Transitional: many views/queries still reference legacy Project.RagStatus mapping until lookup migration is finished -->
     <NoWarn>$(NoWarn);CS0618</NoWarn>
     <!--

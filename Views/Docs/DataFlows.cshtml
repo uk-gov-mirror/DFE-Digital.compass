@@ -508,13 +508,14 @@ flowchart LR
             <ul>
                 <li><code>GET /ModernWork/Create</code> &rarr; multi-step wizard. Each step persists progress into <code>ProjectDraft</code> (one row per user, payload as JSON) so the user can resume later.</li>
                 <li><code>POST /ModernWork/Create</code> &rarr; final submit. Validates, then runs the creation transaction (<code>CreateWorkItem</code>).</li>
+                <li>API: <code>POST /api/v1/WorkItems</code> (Bearer: <code>WorkItems:create</code>) creates the headline <code>Project</code> row without the wizard. See <a class="govuk-link" href="@Url.Action("Api", "Docs")#work-items">API reference</a>.</li>
             </ul>
         </div>
 
         <h4 class="developers-data-flow__label">Stored in</h4>
         <div class="developers-data-flow__body">
             <ul>
-                <li><code>Project</code> &mdash; headline row: <code>Title</code>, <code>Aim</code>, <code>Description</code>, <code>Status</code> = <code>Active</code>, <code>PhaseId</code>, <code>DeliveryPriorityId</code>, <code>WorkType</code> / <code>ActivityTypeId</code>, <code>StartDate</code>, <code>TargetDeliveryDate</code>, <code>PrimaryOrganizationalGroupId</code>, flags (<code>IsFlagship</code>, <code>SubjectToSpendControl</code>, <code>IsCentralRiskBucket</code>, <code>IsAiInitiative</code>).</li>
+                <li><code>Project</code> &mdash; headline row: <code>Title</code>, <code>Aim</code>, <code>Description</code>, <code>Status</code> = <code>Active</code>, <code>PhaseId</code>, <code>DeliveryPriorityId</code>, <code>WorkType</code> / <code>ActivityTypeId</code>, <code>StartDate</code>, <code>TargetDeliveryDate</code>, <code>PrimaryOrganizationalGroupId</code>, flags (<code>IsFlagship</code>, <code>SubjectToSpendControl</code>, <code>IsCentralRiskBucket</code>, <code>IsAiInitiative</code>, <code>ShowInFips</code>).</li>
                 <li>Governance contacts &mdash; <code>ProjectSeniorResponsibleOfficer</code>, <code>ProjectServiceOwner</code>, <code>ProjectPmoContact</code>, <code>ProjectBudgetOwner</code>; plus <code>Project.PrimaryContactUserId</code>.</li>
                 <li>Strategic alignment joins &mdash; <code>ProjectMission</code>, <code>ProjectObjective</code>, <code>ProjectWorkItemTag</code>.</li>
                 <li>Organisational joins &mdash; <code>ProjectDirectorate</code>, <code>ProjectGovernmentDepartment</code>.</li>
@@ -742,6 +743,7 @@ flowchart LR
         <div class="developers-data-flow__body">
             <ul>
                 <li><code>POST /modern/work/{id}/overview/flagship</code></li>
+                <li><code>POST /modern/work/{id}/fips</code> (show in FIPS)</li>
                 <li><code>POST /modern/work/{id}/overview/spend-control</code></li>
                 <li><code>POST /modern/work/{id}/overview/risk-appetite</code></li>
                 <li><code>POST /modern/work/{id}/overview/start-date</code> / <code>/target-end-date</code></li>

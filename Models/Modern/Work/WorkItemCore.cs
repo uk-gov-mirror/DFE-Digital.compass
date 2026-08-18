@@ -38,6 +38,11 @@ public class WorkItem
     public bool SubjectToSpendControl { get; set; }
     public bool FlagshipProject { get; set; }
     public bool IsCentralRiskBucket { get; set; }
+
+    /// <summary>
+    /// When true, this work item is shown in FIPS and can be found by the FIPS service.
+    /// </summary>
+    public bool ShowInFips { get; set; }
     public DateTime? StartDate { get; set; }
     public DateTime? TargetEndDate { get; set; }
     public DateTime CreatedAt { get; set; }

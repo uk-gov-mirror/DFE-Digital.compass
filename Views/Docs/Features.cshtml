@@ -41,6 +41,9 @@
     Modern view model <code>Compass.Models.Modern.Work.WorkItem</code> wraps
     EF entity <code>Compass.Models.Project</code>. List view at
     <code>/modern/work</code>; detail at <code>/modern/work/{id}</code>.
+    Machine access: <code>GET /api/v1/WorkItems</code> and
+    <code>GET /api/v1/WorkItems/{id}</code> (Bearer: <code>WorkItems:read</code>).
+    Full reference is on the <a class="govuk-link" href="@Url.Action("Api", "Docs")#work-items">API reference</a>.
 </p>
 <table class="govuk-table">
     <thead class="govuk-table__head">
@@ -70,6 +73,7 @@
         <tr class="govuk-table__row"><td class="govuk-table__cell"><code>RiskAppetiteId</code></td><td class="govuk-table__cell"><code>Project.RiskAppetiteId</code></td><td class="govuk-table__cell">int? (FK <code>RiskAppetiteLookup</code>)</td><td class="govuk-table__cell">Tolerance level.</td></tr>
         <tr class="govuk-table__row"><td class="govuk-table__cell"><code>SubjectToSpendControl</code></td><td class="govuk-table__cell"><code>Project.SubjectToSpendControl</code></td><td class="govuk-table__cell">bool</td><td class="govuk-table__cell">CDDO spend controls flag.</td></tr>
         <tr class="govuk-table__row"><td class="govuk-table__cell"><code>FlagshipProject</code></td><td class="govuk-table__cell"><code>Project.IsFlagship</code></td><td class="govuk-table__cell">bool</td><td class="govuk-table__cell">Highlighted in registers and dashboards.</td></tr>
+        <tr class="govuk-table__row"><td class="govuk-table__cell"><code>ShowInFips</code></td><td class="govuk-table__cell"><code>Project.ShowInFips</code></td><td class="govuk-table__cell">bool</td><td class="govuk-table__cell">When yes, the work item is shown in FIPS and can be retrieved via <code>GET /api/v1/WorkItems?showInFips=true</code>. Edited on the work detail FIPS card.</td></tr>
         <tr class="govuk-table__row"><td class="govuk-table__cell"><code>IsCentralRiskBucket</code></td><td class="govuk-table__cell"><code>Project.IsCentralRiskBucket</code></td><td class="govuk-table__cell">bool</td><td class="govuk-table__cell">Holds central / cross-cutting risks rather than delivery.</td></tr>
         <tr class="govuk-table__row"><td class="govuk-table__cell"><code>StartDate</code></td><td class="govuk-table__cell"><code>Project.StartDate</code></td><td class="govuk-table__cell">datetime?</td><td class="govuk-table__cell">UTC.</td></tr>
         <tr class="govuk-table__row"><td class="govuk-table__cell"><code>TargetEndDate</code></td><td class="govuk-table__cell"><code>Project.TargetDeliveryDate</code></td><td class="govuk-table__cell">datetime?</td><td class="govuk-table__cell">UTC.</td></tr>

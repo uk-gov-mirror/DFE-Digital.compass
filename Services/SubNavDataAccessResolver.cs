@@ -94,9 +94,11 @@ public sealed class SubNavDataAccessResolver
                 explorer,
                 tokens,
                 "Work and delivery",
-                "Milestones and RAID items linked to work are available over the API. There is no single “work register” list endpoint — use exports for full work-item workbooks.",
+                "Work items and RAID records linked to delivery are available over the API.",
                 new[]
                 {
+                    Ep("Work items", "GET", "/api/v1/WorkItems", "WorkItems:read", "Filter by status, business area, phase, RAG, FIPS visibility or search"),
+                    Ep("Work item", "GET", "/api/v1/WorkItems/{id}", "WorkItems:read"),
                     Ep("Milestones", "GET", "/api/v1/Milestones", "Milestones:read"),
                     Ep("Risks", "GET", "/api/v1/Risks", "Risks:read", "Filter by status, score, or product"),
                     Ep("Issues", "GET", "/api/v1/Issues", "Issues:read")
@@ -181,9 +183,10 @@ public sealed class SubNavDataAccessResolver
                 explorer,
                 tokens,
                 "Reporting",
-                "Use the endpoints for the underlying datasets (work, RAID, service register, performance) rather than report views.",
+                "Use the endpoints for the underlying datasets (work items, RAID, service register, performance) rather than report views.",
                 new[]
                 {
+                    Ep("Work items", "GET", "/api/v1/WorkItems", "WorkItems:read"),
                     Ep("Milestones", "GET", "/api/v1/Milestones", "Milestones:read"),
                     Ep("Risks", "GET", "/api/v1/Risks", "Risks:read"),
                     Ep("Service register", "GET", "/api/v1/ServiceRegister/products", "ServiceRegister:read")
@@ -571,8 +574,8 @@ public sealed class SubNavDataAccessResolver
                 ItemApi(
                     baseUrl, docs, explorer, tokens,
                     "Get this work item as data",
-                    "There is no single work-item REST endpoint yet. Download a JSON snapshot below, or use the Milestones and RAID APIs for related records.",
-                    itemEndpoint: null),
+                    "Pull this record from the COMPASS API, or download a snapshot.",
+                    itemEndpoint: ApiItem(baseUrl, "GET", $"/api/v1/WorkItems/{workId}", "WorkItems:read")),
                 isItem: true),
 
             ("ModernRaid", "RiskDetail") when TryGetIntRouteId(c, out var riskId) => ItemOptions(
