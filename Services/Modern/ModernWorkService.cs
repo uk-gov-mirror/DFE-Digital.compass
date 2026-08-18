@@ -681,6 +681,7 @@ public partial class ModernWorkService : IModernWorkService
             Title = p.Title,
             Status = p.Status ?? "Active",
             FlagshipProject = p.IsFlagship,
+            ShowInFips = p.ShowInFips,
             PortfolioId = p.BusinessAreaId ?? p.PrimaryOrganizationalGroupId,
             DeliveryPhaseId = p.PhaseId,
             PriorityId = p.DeliveryPriorityId,

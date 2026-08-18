@@ -31,18 +31,18 @@ public static class DocsSpecificationsCatalog
                 "Project (work item), RAG and priority lookups, organisational groups, directorates, tags.",
                 "Signed-in Entra user ([Authorize] on ModernWorkController). No feature gate. List is not restricted by ownership; edit actions on detail are gated separately.",
                 "Register data feeds Reporting → monthly update progress, thematic views and PowerBI exports. Linked RAID and milestones roll up to portfolio reporting.",
-                "No dedicated Projects REST resource. Related data via Milestones API where linked. Work item JSON export: GET /modern/item-data/work-items/{id} (session auth)."),
+                "GET/POST/PUT/DELETE /api/v1/WorkItems (Bearer: WorkItems read/create/update/delete). Related data via Milestones, Risks and Issues APIs where linked."),
 
             Spec(
                 "work-detail",
                 "Work item detail",
                 "View a single work item",
                 "/modern/work/{id}",
-                "Hub for delivery metadata, strategic alignment summary, monthly updates, milestones, RAID tabs, contacts and service register links.",
-                "Project, ProjectContact, ProjectMission, ProjectObjective, monthly updates, milestones, RAID assignments, FIPS product links (when fips feature on).",
+                "Hub for delivery metadata, strategic alignment summary, monthly updates, milestones, RAID tabs, contacts, FIPS visibility and service register links.",
+                "Project (including ShowInFips), ProjectContact, ProjectMission, ProjectObjective, monthly updates, milestones, RAID assignments, FIPS product links (when fips feature on).",
                 "Signed-in user. Mutations require CanUserEditWorkItemAsync (project contact, creator, SRO, service owner, PMO, business-area admin/leader, directorate leader, or Admin / Central Operations Admin / super admin). RAID tabs also require FeatureCodes.Raid.",
                 "Detail is the source of truth for monthly reporting narratives, RAID context on work, and commission performance attribution.",
-                "See work-register API notes. Milestones: GET/POST /api/v1/milestones. Risks/issues on work: UI only unless assigned records exposed via Risks/Issues API."),
+                "GET /api/v1/WorkItems/{id}. Milestones: GET/POST /api/v1/Milestones. Risks/issues on work: GET /api/v1/Risks and /api/v1/Issues."),
 
             Spec(
                 "work-strategic-alignment",
@@ -413,7 +413,7 @@ public static class DocsSpecificationsCatalog
                 "MonthlyUpdate, Project, reporting period.",
                 "Signed-in user.",
                 "Oversight of delivery reporting cycle; pairs with work monthly update capture.",
-                "No dedicated API; use exports or work item queries."),
+                "GET /api/v1/WorkItems; monthly narrative fields remain UI/export only."),
 
             Spec(
                 "reporting-monthly-submission-progress",

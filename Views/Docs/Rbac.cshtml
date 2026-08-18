@@ -540,8 +540,9 @@ public interface IPermissionService
                 <th scope="row" class="govuk-table__header"><code>ModernWorkController</code> &mdash; <code>Controllers/Modern/ModernWorkController.cs:28</code></th>
                 <td class="govuk-table__cell"><code>[Authorize]</code></td>
                 <td class="govuk-table__cell">
-                    <code>[ServiceFilter(typeof(RaidFeatureGateFilter))]</code> on RAID-on-work endpoints (lines 3595, 3618, 3649, 3675, 3909, 3922).
+                    <code>[ServiceFilter(typeof(RaidFeatureGateFilter))]</code> on RAID-on-work endpoints.
                     Every mutation calls <code>EnsureUserCanEditWorkAsync(projectId)</code> &mdash; see <a class="govuk-link" href="#imperative">imperative checks</a>.
+                    Machine access: <code>WorkItemsController</code> at <code>/api/v1/WorkItems</code> with <code>[RequireApiPermission("WorkItems", …)]</code>.
                 </td>
             </tr>
             <tr class="govuk-table__row">
@@ -1074,30 +1075,29 @@ return operation.ToLower() switch
 
 <h3 class="govuk-heading-m" id="token-resources">Resource catalogue</h3>
 <p class="govuk-body">
-    The permission UI iterates a fixed array at
-    <code>Controllers/Modern/ModernAdminController.cs:3333-3341</code>:
+    The permission UI iterates <code>ApiTokenResourceCatalog.Resources</code>
+    in <code>Services/Api/ApiTokenResourceCatalog.cs</code> (also aliased as
+    <code>ModernAdminController.ApiTokenResources</code>):
 </p>
 
-```3333:3341:Controllers/Modern/ModernAdminController.cs
-private static readonly string[] ApiTokenResources = new[]
-{
-    "Risks", "Issues", "Actions", "Milestones", "PerformanceMetrics",
-    "EnterpriseMetrics", "FunctionalStandards", "AccessibilityIssues",
-    "SurveysAdmin", "UserSatisfactionQuestions", "UserSatisfactionResponses", "DdtStandards",
-    "ServiceRegister",
-    "CmsAccessRequests",
-    "AdminLookups"
-};
+```
+WorkItems, Risks, Issues, Milestones, PerformanceMetrics,
+EnterpriseMetrics, FunctionalStandards, DdtStandards,
+ServiceRegister, CmsAccessRequests, AdminLookups
 ```
 
 <p class="govuk-body">
     Each <code>Api/V1/*Controller</code> decorates its actions with the
     matching <code>[RequireApiPermission("&lt;resource&gt;", "&lt;operation&gt;")]</code>.
+    Work items are <code>WorkItemsController</code> at
+    <code>/api/v1/WorkItems</code>.
     <code>DdtStandardsController</code> is an exception &mdash; its 12 read
     endpoints are <code>[AllowAnonymous]</code> on purpose (the controller
     enforces <code>Where(s =&gt; s.IsPublished &amp;&amp; s.Stage == "Published")</code>
     on every query), and only the write endpoints require
     <code>"DdtStandards"</code> token scopes.
+    Read-only-all-data tokens issued before a catalog resource existed inherit
+    <code>read</code> on the new resource via <code>ApiTokenResourceCatalog.GrantsRead</code>.
 </p>
 
 <h3 class="govuk-heading-m" id="api-middleware">Middleware behaviour</h3>
@@ -1194,7 +1194,7 @@ if (!isApiV1 && !isFipsProductLookups)
 <h3 class="govuk-heading-m" id="cookbook-api">Add a new API endpoint</h3>
 <ol class="govuk-list govuk-list--number">
     <li>Place the controller under <code>Controllers/Api/V1/</code>.</li>
-    <li>Decorate the action with <code>[RequireApiPermission("&lt;Resource&gt;", "&lt;operation&gt;")]</code> using a resource name that is already in <code>ApiTokenResources</code>. If you need a new resource, add it to <code>ApiTokenResources</code> at <code>ModernAdminController.cs:3333-3341</code> so admins can grant it on the token-permissions screen.</li>
+    <li>Decorate the action with <code>[RequireApiPermission("&lt;Resource&gt;", "&lt;operation&gt;")]</code> using a resource name that is already in <code>ApiTokenResourceCatalog.Resources</code>. If you need a new resource, add it there so admins can grant it on the token-permissions screen, and add matching cards to <code>Models/Docs/ApiCatalogue.cs</code>.</li>
     <li>Operations are case-insensitive strings; stick to <code>"read" / "create" / "update" / "delete"</code> (the validator also accepts <code>"get" / "post" / "put" / "patch"</code>).</li>
     <li>Do <strong>not</strong> add <code>[Authorize]</code> &mdash; the middleware is Bearer-only for <code>/api/v1/*</code>.</li>
 </ol>

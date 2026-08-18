@@ -82,4 +82,26 @@ public partial class ModernWorkController
         TempData["SuccessMessage"] = "Service register entry unlinked.";
         return Redirect(Url.Action(nameof(Detail), new { id })! + "#wd-service-register");
     }
+
+    [HttpPost("{id:int}/fips")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateShowInFips(int id, bool? showInFips, CancellationToken ct)
+    {
+        var deny = await EnsureUserCanEditWorkAsync(id, ct);
+        if (deny != null)
+            return deny;
+
+        var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct);
+        if (project == null)
+            return NotFound();
+
+        project.ShowInFips = showInFips == true;
+        project.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(ct);
+
+        TempData["SuccessMessage"] = project.ShowInFips
+            ? "This work item will be shown in FIPS."
+            : "This work item will not be shown in FIPS.";
+        return Redirect(Url.Action(nameof(Detail), new { id })! + "#wd-service-register");
+    }
 }

@@ -9,6 +9,15 @@ public class FipsSyncConfiguration
     public StrapiEnvironments Strapi { get; set; } = new();
     public SasConfiguration Sas { get; set; } = new();
     public AissConfiguration Aiss { get; set; } = new();
+
+    /// <summary>When true, Compass runs bulk CMDB → service register sync once per UK day.</summary>
+    public bool DailySyncEnabled { get; set; } = true;
+
+    /// <summary>Hour of the UK day (0–23) to start the scheduled bulk sync. Default 6 (06:00).</summary>
+    public int DailySyncHourUk { get; set; } = 6;
+
+    /// <summary>Recipient for the daily sync summary email.</summary>
+    public string DailySyncSummaryEmail { get; set; } = "fips.service@education.gov.uk";
 }
 
 public class CmdbConfiguration
