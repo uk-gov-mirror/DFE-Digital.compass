@@ -804,7 +804,7 @@ public static class ApiCatalogue
                     Method: "GET",
                     Path: "/api/v1/ServiceRegister/products",
                     Scope: "ServiceRegister:read",
-                    Description: "Paged FIPS/CMDB product list with rich filters. numericId bypasses status filters (used by onboarding search).",
+                    Description: "Paged FIPS/CMDB product list with rich filters. Each row includes channels and types from the service register entry. numericId bypasses status filters (used by onboarding search).",
                     QueryParams: new[]
                     {
                         ("page", "integer", "Page number (default 1)"),
@@ -826,10 +826,12 @@ public static class ApiCatalogue
   "data": [
     {
       "id": "0c64e10b-…",
-      "fipsId": "FIPS-2491",
-      "name": "Apply for a teacher reference",
+      "uniqueId": 2491,
+      "productName": "Apply for a teacher reference",
       "status": "Active",
-      "businessArea": { "id": 5, "name": "Teacher Services" }
+      "businessArea": "Teacher Services",
+      "channels": [ { "id": 1, "name": "Web" } ],
+      "types": [ { "id": 3, "name": "Transactional" } ]
     }
   ],
   "pagination": { "currentPage": 1, "pageSize": 100, "totalPages": 9, "totalRecords": 824 }
@@ -859,16 +861,20 @@ public static class ApiCatalogue
                     Method: "GET",
                     Path: "/api/v1/ServiceRegister/products/{id}",
                     Scope: "ServiceRegister:read",
-                    Description: "Single FIPS/CMDB product with categorisations and contacts.",
+                    Description: "Single FIPS/CMDB product with channels, types, categorisations and contacts.",
                     RouteParams: new[] { ("id", "guid", "Product UUID") },
                     ResponseExample: """
 {
-  "id": "0c64e10b-…",
-  "fipsId": "FIPS-2491",
-  "name": "Apply for a teacher reference",
-  "status": "Active",
-  "categorisations": [ { "groupName": "Audience", "itemName": "Teachers" } ],
-  "contacts": [ { "roleName": "Service owner", "userEmail": "owner@education.gov.uk" } ]
+  "data": {
+    "id": "0c64e10b-…",
+    "uniqueId": 2491,
+    "productName": "Apply for a teacher reference",
+    "status": "Active",
+    "channels": [ { "id": 1, "name": "Web" } ],
+    "types": [ { "id": 3, "name": "Transactional" } ],
+    "categories": [ { "groupName": "Audience", "name": "Teachers" } ],
+    "contacts": [ { "role": "Service owner", "email": "owner@education.gov.uk" } ]
+  }
 }
 """),
                 new(

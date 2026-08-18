@@ -110,18 +110,11 @@ public class ServiceRegisterController : ControllerBase
         var totalRecords = await baseQuery.CountAsync(cancellationToken);
         var totalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
 
-        var products = await baseQuery
-            .OrderBy(p => p.Title)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Include(p => p.Phase)
-            .Include(p => p.BusinessAreas)
-            .ThenInclude(ba => ba.FipsBusinessArea)
-            .Include(p => p.Contacts)
-            .ThenInclude(c => c.FipsContactRole)
-            .Include(p => p.CategorisationItems)
-            .ThenInclude(ci => ci.FipsCategorisationItem)
-            .ThenInclude(i => i.Group)
+        var products = await IncludeProductListGraph(
+                baseQuery
+                    .OrderBy(p => p.Title)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize))
             .ToListAsync(cancellationToken);
 
         var rows = products.Select(MapProductListRow).ToList();
@@ -331,18 +324,11 @@ public class ServiceRegisterController : ControllerBase
         var totalRecords = await baseQuery.CountAsync(cancellationToken);
         var totalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
 
-        var products = await baseQuery
-            .OrderBy(p => p.Title)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Include(p => p.Phase)
-            .Include(p => p.BusinessAreas)
-            .ThenInclude(ba => ba.FipsBusinessArea)
-            .Include(p => p.Contacts)
-            .ThenInclude(c => c.FipsContactRole)
-            .Include(p => p.CategorisationItems)
-            .ThenInclude(ci => ci.FipsCategorisationItem)
-            .ThenInclude(i => i.Group)
+        var products = await IncludeProductListGraph(
+                baseQuery
+                    .OrderBy(p => p.Title)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize))
             .ToListAsync(cancellationToken);
 
         var rows = products.Select(MapProductListRow).ToList();
@@ -367,16 +353,8 @@ public class ServiceRegisterController : ControllerBase
     [RequireApiPermission("ServiceRegister", "read")]
     public async Task<IActionResult> GetProduct(Guid id, CancellationToken cancellationToken = default)
     {
-        var p = await _context.CMDBProducts.AsNoTracking()
-            .Where(x => x.Id == id)
-            .Include(x => x.Phase)
-            .Include(x => x.BusinessAreas)
-            .ThenInclude(ba => ba.FipsBusinessArea)
-            .Include(x => x.Contacts)
-            .ThenInclude(c => c.FipsContactRole)
-            .Include(x => x.CategorisationItems)
-            .ThenInclude(ci => ci.FipsCategorisationItem)
-            .ThenInclude(i => i.Group)
+        var p = await IncludeProductListGraph(
+                _context.CMDBProducts.AsNoTracking().Where(x => x.Id == id))
             .FirstOrDefaultAsync(cancellationToken);
 
         if (p == null)
@@ -612,6 +590,21 @@ public class ServiceRegisterController : ControllerBase
 
     private static string TruncateForAudit(string s) => s.Length > 200 ? s[..200] : s;
 
+    private static IQueryable<CMDBProduct> IncludeProductListGraph(IQueryable<CMDBProduct> query) =>
+        query
+            .Include(p => p.Phase)
+            .Include(p => p.BusinessAreas)
+            .ThenInclude(ba => ba.FipsBusinessArea)
+            .Include(p => p.Channels)
+            .ThenInclude(c => c.FipsChannel)
+            .Include(p => p.Types)
+            .ThenInclude(t => t.FipsType)
+            .Include(p => p.Contacts)
+            .ThenInclude(c => c.FipsContactRole)
+            .Include(p => p.CategorisationItems)
+            .ThenInclude(ci => ci.FipsCategorisationItem)
+            .ThenInclude(i => i.Group);
+
     private static IQueryable<CMDBProduct> ApplyProductFilters(
         IQueryable<CMDBProduct> query,
         int[]? categoryIds,
@@ -688,6 +681,26 @@ public class ServiceRegisterController : ControllerBase
             status = p.Status.ToString(),
             isEnterpriseService = p.IsEnterpriseService,
             longDescription = ResolveLongDescription(p),
+            channels = p.Channels
+                .Where(c => c.FipsChannel != null)
+                .OrderBy(c => c.FipsChannel.DisplayOrder)
+                .ThenBy(c => c.FipsChannel.Name)
+                .Select(c => new
+                {
+                    id = c.FipsChannelId,
+                    name = c.FipsChannel.Name
+                })
+                .ToList(),
+            types = p.Types
+                .Where(t => t.FipsType != null)
+                .OrderBy(t => t.FipsType.DisplayOrder)
+                .ThenBy(t => t.FipsType.Name)
+                .Select(t => new
+                {
+                    id = t.FipsTypeId,
+                    name = t.FipsType.Name
+                })
+                .ToList(),
             categories = p.CategorisationItems
                 .OrderBy(ci => ci.FipsCategorisationItem.Group.DisplayOrder)
                 .ThenBy(ci => ci.FipsCategorisationItem.DisplayOrder)
