@@ -23,10 +23,8 @@ public static class RiskAuditTimelineBuilder
             .Take(120)
             .ToListAsync(cancellationToken);
 
-        var mitigationActionIds = await db.RiskActions.AsNoTracking()
-            .Where(ra => ra.RiskId == riskId)
-            .Select(ra => ra.ActionId)
-            .ToListAsync(cancellationToken);
+        var mitigationActionIds = await RaidRiskMitigations.ActionIdsForRiskAsync(
+            db, riskId, cancellationToken);
 
         var idStrSet = mitigationActionIds.Select(x => x.ToString()).ToHashSet(StringComparer.Ordinal);
         List<AuditLog> actionLogs = new();
@@ -92,11 +90,7 @@ public static class RiskAuditTimelineBuilder
             });
         }
 
-        var mitigations = await db.RiskActions.AsNoTracking()
-            .Include(ra => ra.Action)
-            .Where(ra => ra.RiskId == riskId && ra.Action != null && !ra.Action.IsDeleted)
-            .Select(ra => new { ra.ActionId, ra.Action!.Title, ra.Action.Notes })
-            .ToListAsync(cancellationToken);
+        var mitigations = await RaidRiskMitigations.LoadLinksForRiskAsync(db, riskId, cancellationToken);
 
         foreach (var mitigation in mitigations)
         {

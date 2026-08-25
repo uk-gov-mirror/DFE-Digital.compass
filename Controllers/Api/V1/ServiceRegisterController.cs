@@ -29,8 +29,8 @@ public class ServiceRegisterController : ControllerBase
 
     /// <summary>
     /// List FIPS / service register (CMDB) products. Grant <c>read</c> on resource <c>ServiceRegister</c> for the API token.
-    /// Use <c>status=Active</c> with <c>excludeEnterprise=true</c> for the AISS standard catalogue; <c>numericId</c> looks up by
-    /// <see cref="CMDBProduct.UniqueID"/> (FIPS numeric id) and ignores status filters so onboarding search finds a row
+    /// Use <c>status=Active</c> with <c>excludeEnterprise=true</c> for the AISS standard catalogue; <c>uniqueId</c> (alias
+    /// <c>numericId</c>) looks up by <see cref="CMDBProduct.UniqueID"/> and ignores status filters so onboarding search finds a row
     /// even when enterprise or sync left it Inactive/Rejected. <c>GET .../products/enterprise-active</c> lists
     /// enterprise-flagged products excluding retired/rejected (includes New and Active).
     /// Optional <c>categoryIds</c> (repeat param): product matches if it has any of those FIPS categorisation items.
@@ -46,6 +46,7 @@ public class ServiceRegisterController : ControllerBase
         [FromQuery] string[]? status = null,
         [FromQuery] bool? enterpriseOnly = null,
         [FromQuery] bool? excludeEnterprise = null,
+        [FromQuery] int? uniqueId = null,
         [FromQuery] int? numericId = null,
         [FromQuery] int[]? categoryIds = null,
         [FromQuery] int[]? channelIds = null,
@@ -83,9 +84,10 @@ public class ServiceRegisterController : ControllerBase
         }
 
         var baseQuery = _context.CMDBProducts.AsNoTracking();
-        if (numericId.HasValue)
+        var lookupUniqueId = uniqueId ?? numericId;
+        if (lookupUniqueId.HasValue)
         {
-            baseQuery = baseQuery.Where(p => p.UniqueID == numericId.Value);
+            baseQuery = baseQuery.Where(p => p.UniqueID == lookupUniqueId.Value);
         }
         else
         {
@@ -347,16 +349,45 @@ public class ServiceRegisterController : ControllerBase
     }
 
     /// <summary>
-    /// Get a single FIPS / service register product by id. Grant <c>read</c> on resource <c>ServiceRegister</c> for the API token.
+    /// Get a single FIPS / service register product by Compass GUID. Grant <c>read</c> on resource <c>ServiceRegister</c>.
     /// </summary>
     [HttpGet("products/{id:guid}")]
     [RequireApiPermission("ServiceRegister", "read")]
-    public async Task<IActionResult> GetProduct(Guid id, CancellationToken cancellationToken = default)
-    {
-        var p = await IncludeProductListGraph(
-                _context.CMDBProducts.AsNoTracking().Where(x => x.Id == id))
-            .FirstOrDefaultAsync(cancellationToken);
+    public Task<IActionResult> GetProduct(Guid id, CancellationToken cancellationToken = default) =>
+        GetProductCoreAsync(id, uniqueId: null, cancellationToken);
 
+    /// <summary>
+    /// Get a single FIPS / service register product by numeric <see cref="CMDBProduct.UniqueID"/>.
+    /// Grant <c>read</c> on resource <c>ServiceRegister</c>.
+    /// </summary>
+    [HttpGet("products/{uniqueId:int}")]
+    [RequireApiPermission("ServiceRegister", "read")]
+    public Task<IActionResult> GetProductByUniqueId(int uniqueId, CancellationToken cancellationToken = default) =>
+        GetProductCoreAsync(id: null, uniqueId, cancellationToken);
+
+    private async Task<IActionResult> GetProductCoreAsync(
+        Guid? id,
+        int? uniqueId,
+        CancellationToken cancellationToken)
+    {
+        IQueryable<CMDBProduct> query = _context.CMDBProducts.AsNoTracking();
+        if (id.HasValue)
+            query = query.Where(x => x.Id == id.Value);
+        else if (uniqueId is > 0)
+            query = query.Where(x => x.UniqueID == uniqueId.Value);
+        else
+        {
+            return BadRequest(new
+            {
+                error = new
+                {
+                    code = "INVALID_ID",
+                    message = "Provide a product GUID or a positive uniqueId."
+                }
+            });
+        }
+
+        var p = await IncludeProductListGraph(query).FirstOrDefaultAsync(cancellationToken);
         if (p == null)
         {
             return NotFound(new
@@ -369,9 +400,7 @@ public class ServiceRegisterController : ControllerBase
             });
         }
 
-        var row = MapProductListRow(p);
-
-        return Ok(new { data = row });
+        return Ok(new { data = MapProductListRow(p) });
     }
 
     /// <summary>

@@ -474,12 +474,16 @@
 
         <fieldset class="govuk-fieldset govuk-!-margin-bottom-6" data-raid-field="residual-rating">
           <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Residual risk rating</legend>
-          <div class="govuk-hint">The risk level after existing controls and mitigations are applied.</div>
+          <div class="govuk-hint">The risk level after existing controls and mitigations. Residual (likelihood × impact) must not be higher than the tolerance rating.</div>
+          @if (RaidErr("ResidualLikelihoodId") is { } residualErr)
+          {
+            <p class="govuk-error-message" id="residual-rating-error"><span class="govuk-visually-hidden">Error:</span> @residualErr</p>
+          }
           <div class="govuk-grid-row">
             <div class="govuk-grid-column-one-half">
-              <div class="govuk-form-group">
+              <div class="govuk-form-group@(RaidErr("ResidualLikelihoodId") != null ? " govuk-form-group--error" : null)">
                 <label class="govuk-label" for="ResidualLikelihoodId">Likelihood</label>
-                <select class="govuk-select govuk-!-width-full" id="ResidualLikelihoodId" name="ResidualLikelihoodId">
+                <select class="govuk-select govuk-!-width-full" id="ResidualLikelihoodId" name="ResidualLikelihoodId" aria-describedby="@(RaidErr("ResidualLikelihoodId") != null ? "residual-rating-error" : null)">
                   <option value="">— Select —</option>
                   @foreach (var o in lh)
                   {
@@ -507,7 +511,7 @@
 
         <fieldset class="govuk-fieldset govuk-!-margin-bottom-6" data-raid-field="tolerance-rating">
           <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">Tolerance risk rating</legend>
-          <div class="govuk-hint">The maximum acceptable risk level the organisation is willing to tolerate.</div>
+          <div class="govuk-hint">The maximum acceptable risk level the organisation is willing to tolerate. Residual must not exceed this rating.</div>
           <div class="govuk-grid-row">
             <div class="govuk-grid-column-one-half">
               <div class="govuk-form-group">

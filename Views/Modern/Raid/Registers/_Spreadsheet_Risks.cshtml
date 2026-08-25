@@ -14,6 +14,8 @@
     </div>
   }
   <div class="raid-ss-toolbar-actions">
+    <label class="govuk-visually-hidden" for="raid-ss-search-risks">Search risks by title, owner or description</label>
+    <input type="search" id="raid-ss-search-risks" class="govuk-input raid-ss-global-search" data-raid-ss-search="tbl-risks" placeholder="Search title, owner, description" autocomplete="off" />
     @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_Spreadsheet_ToolbarIcons.cshtml", Model.Id)
     <button type="button" class="govuk-button govuk-!-margin-bottom-0 raid-ss-fullscreen-btn" data-module="govuk-button">
       <span class="btn-fs-expand">Expand table</span>
@@ -122,44 +124,44 @@
               var inherentImpactLocked = risk.OriginalImpactId.HasValue && !Model.CanEditLockedInherentRatings;
               var inherentLikelihoodLocked = risk.OriginalLikelihoodId.HasValue && !Model.CanEditLockedInherentRatings;
             }
-            <td class="govuk-table__cell@(inherentImpactLocked ? "" : " raid-ss-editable") raid-ss-group-start" data-field="originalImpactId" data-type="select" data-lookup="riskImpactLevels" data-current="@risk.OriginalImpactId"@(inherentImpactLocked ? " data-inherent-locked=\"true\"" : "")>
-              <span class="raid-ss-val">@(risk.OriginalImpact ?? "—")</span>
+            <td class="govuk-table__cell@(inherentImpactLocked ? "" : " raid-ss-editable") raid-ss-badge-cell raid-ss-group-start" data-field="originalImpactId" data-type="select" data-lookup="riskImpactLevels" data-badge-kind="likelihoodImpact" data-current="@risk.OriginalImpactId"@(inherentImpactLocked ? " data-inherent-locked=\"true\"" : "")>
+              @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_Spreadsheet_LookupBadge.cshtml", (WorkBadgeCss.RaidRiskLikelihoodImpactLabelDfeFrontendBadgeClass(risk.OriginalImpact), RaidRegisterTableFormatting.SpreadsheetBadgeLabel(risk.OriginalImpact, uppercase: true)))
             </td>
-            <td class="govuk-table__cell@(inherentLikelihoodLocked ? "" : " raid-ss-editable")" data-field="originalLikelihoodId" data-type="select" data-lookup="riskLikelihoods" data-current="@risk.OriginalLikelihoodId"@(inherentLikelihoodLocked ? " data-inherent-locked=\"true\"" : "")>
-              <span class="raid-ss-val">@(risk.OriginalLikelihood ?? "—")</span>
+            <td class="govuk-table__cell@(inherentLikelihoodLocked ? "" : " raid-ss-editable") raid-ss-badge-cell" data-field="originalLikelihoodId" data-type="select" data-lookup="riskLikelihoods" data-badge-kind="likelihoodImpact" data-current="@risk.OriginalLikelihoodId"@(inherentLikelihoodLocked ? " data-inherent-locked=\"true\"" : "")>
+              @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_Spreadsheet_LookupBadge.cshtml", (WorkBadgeCss.RaidRiskLikelihoodImpactLabelDfeFrontendBadgeClass(risk.OriginalLikelihood), RaidRegisterTableFormatting.SpreadsheetBadgeLabel(risk.OriginalLikelihood, uppercase: true)))
             </td>
             <td class="govuk-table__cell govuk-table__cell--numeric raid-ss-score raid-ss-group-end" data-score-field="inherentScore">
               @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_SpreadsheetRiskScoreBadge.cshtml", risk.InherentScore)
             </td>
 
             @* ── Current rating ── *@
-            <td class="govuk-table__cell raid-ss-editable raid-ss-group-start" data-field="currentImpactId" data-type="select" data-lookup="riskImpactLevels" data-current="@risk.CurrentImpactId">
-              <span class="raid-ss-val">@(risk.CurrentImpact ?? "—")</span>
+            <td class="govuk-table__cell raid-ss-editable raid-ss-badge-cell raid-ss-group-start" data-field="currentImpactId" data-type="select" data-lookup="riskImpactLevels" data-badge-kind="likelihoodImpact" data-current="@risk.CurrentImpactId">
+              @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_Spreadsheet_LookupBadge.cshtml", (WorkBadgeCss.RaidRiskLikelihoodImpactLabelDfeFrontendBadgeClass(risk.CurrentImpact), RaidRegisterTableFormatting.SpreadsheetBadgeLabel(risk.CurrentImpact, uppercase: true)))
             </td>
-            <td class="govuk-table__cell raid-ss-editable" data-field="currentLikelihoodId" data-type="select" data-lookup="riskLikelihoods" data-current="@risk.CurrentLikelihoodId">
-              <span class="raid-ss-val">@(risk.CurrentLikelihood ?? "—")</span>
+            <td class="govuk-table__cell raid-ss-editable raid-ss-badge-cell" data-field="currentLikelihoodId" data-type="select" data-lookup="riskLikelihoods" data-badge-kind="likelihoodImpact" data-current="@risk.CurrentLikelihoodId">
+              @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_Spreadsheet_LookupBadge.cshtml", (WorkBadgeCss.RaidRiskLikelihoodImpactLabelDfeFrontendBadgeClass(risk.CurrentLikelihood), RaidRegisterTableFormatting.SpreadsheetBadgeLabel(risk.CurrentLikelihood, uppercase: true)))
             </td>
             <td class="govuk-table__cell govuk-table__cell--numeric raid-ss-score raid-ss-group-end" data-score-field="currentScore">
               @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_SpreadsheetRiskScoreBadge.cshtml", risk.CurrentScore)
             </td>
 
             @* ── Residual rating ── *@
-            <td class="govuk-table__cell raid-ss-editable raid-ss-group-start" data-field="residualImpactId" data-type="select" data-lookup="riskImpactLevels" data-current="@risk.ResidualImpactId">
-              <span class="raid-ss-val">@(risk.ResidualImpact ?? "—")</span>
+            <td class="govuk-table__cell raid-ss-editable raid-ss-badge-cell raid-ss-group-start" data-field="residualImpactId" data-type="select" data-lookup="riskImpactLevels" data-badge-kind="likelihoodImpact" data-current="@risk.ResidualImpactId">
+              @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_Spreadsheet_LookupBadge.cshtml", (WorkBadgeCss.RaidRiskLikelihoodImpactLabelDfeFrontendBadgeClass(risk.ResidualImpact), RaidRegisterTableFormatting.SpreadsheetBadgeLabel(risk.ResidualImpact, uppercase: true)))
             </td>
-            <td class="govuk-table__cell raid-ss-editable" data-field="residualLikelihoodId" data-type="select" data-lookup="riskLikelihoods" data-current="@risk.ResidualLikelihoodId">
-              <span class="raid-ss-val">@(risk.ResidualLikelihood ?? "—")</span>
+            <td class="govuk-table__cell raid-ss-editable raid-ss-badge-cell" data-field="residualLikelihoodId" data-type="select" data-lookup="riskLikelihoods" data-badge-kind="likelihoodImpact" data-current="@risk.ResidualLikelihoodId">
+              @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_Spreadsheet_LookupBadge.cshtml", (WorkBadgeCss.RaidRiskLikelihoodImpactLabelDfeFrontendBadgeClass(risk.ResidualLikelihood), RaidRegisterTableFormatting.SpreadsheetBadgeLabel(risk.ResidualLikelihood, uppercase: true)))
             </td>
             <td class="govuk-table__cell govuk-table__cell--numeric raid-ss-score raid-ss-group-end" data-score-field="residualScore">
               @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_SpreadsheetRiskScoreBadge.cshtml", risk.ResidualScore)
             </td>
 
             @* ── Tolerance rating ── *@
-            <td class="govuk-table__cell raid-ss-editable raid-ss-group-start" data-field="toleranceImpactId" data-type="select" data-lookup="riskImpactLevels" data-current="@risk.ToleranceImpactId">
-              <span class="raid-ss-val">@(risk.ToleranceImpact ?? "—")</span>
+            <td class="govuk-table__cell raid-ss-editable raid-ss-badge-cell raid-ss-group-start" data-field="toleranceImpactId" data-type="select" data-lookup="riskImpactLevels" data-badge-kind="likelihoodImpact" data-current="@risk.ToleranceImpactId">
+              @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_Spreadsheet_LookupBadge.cshtml", (WorkBadgeCss.RaidRiskLikelihoodImpactLabelDfeFrontendBadgeClass(risk.ToleranceImpact), RaidRegisterTableFormatting.SpreadsheetBadgeLabel(risk.ToleranceImpact, uppercase: true)))
             </td>
-            <td class="govuk-table__cell raid-ss-editable" data-field="toleranceLikelihoodId" data-type="select" data-lookup="riskLikelihoods" data-current="@risk.ToleranceLikelihoodId">
-              <span class="raid-ss-val">@(risk.ToleranceLikelihood ?? "—")</span>
+            <td class="govuk-table__cell raid-ss-editable raid-ss-badge-cell" data-field="toleranceLikelihoodId" data-type="select" data-lookup="riskLikelihoods" data-badge-kind="likelihoodImpact" data-current="@risk.ToleranceLikelihoodId">
+              @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_Spreadsheet_LookupBadge.cshtml", (WorkBadgeCss.RaidRiskLikelihoodImpactLabelDfeFrontendBadgeClass(risk.ToleranceLikelihood), RaidRegisterTableFormatting.SpreadsheetBadgeLabel(risk.ToleranceLikelihood, uppercase: true)))
             </td>
             <td class="govuk-table__cell govuk-table__cell--numeric raid-ss-score raid-ss-group-end" data-score-field="toleranceScore">
               @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_SpreadsheetRiskScoreBadge.cshtml", risk.ToleranceScore)

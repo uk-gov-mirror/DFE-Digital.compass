@@ -728,6 +728,7 @@ public partial class ModernRaidController
                 NextReviewDate = rr.Risk.NextReviewDate,
                 CreatedAt = rr.Risk.CreatedAt,
                 IdentifiedDate = rr.Risk.IdentifiedDate,
+                LastReviewDate = rr.Risk.LastReviewDate,
                 UpdatedAt = rr.Risk.UpdatedAt,
                 CommentCount = _db.Comments.Count(c => c.EntityType == "Risk" && c.EntityId == rr.Risk.Id && !c.IsDeleted)
             }).ToListAsync(cancellationToken);
@@ -735,12 +736,8 @@ public partial class ModernRaidController
         var riskIds = risks.Select(r => r.Id).ToList();
         if (riskIds.Count > 0)
         {
-            var mitigationCounts = await _db.RiskActions.AsNoTracking()
-                .Where(ra => riskIds.Contains(ra.RiskId) && ra.Action != null && !ra.Action.IsDeleted)
-                .GroupBy(ra => ra.RiskId)
-                .Select(g => new { RiskId = g.Key, Count = g.Count() })
-                .ToListAsync(cancellationToken);
-            var mitigationCountByRiskId = mitigationCounts.ToDictionary(x => x.RiskId, x => x.Count);
+            var mitigationCountByRiskId = await RaidRiskMitigations.CountByRiskIdsAsync(
+                _db, riskIds, cancellationToken);
             foreach (var risk in risks)
                 risk.MitigationCount = mitigationCountByRiskId.GetValueOrDefault(risk.Id);
 
@@ -766,10 +763,8 @@ public partial class ModernRaidController
                 .Select(g => new { RiskId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.RiskId, x => x.Count, cancellationToken);
 
-            var mitigationNotesByRisk = await _db.RiskActions.AsNoTracking()
-                .Where(ra => riskIds.Contains(ra.RiskId) && ra.Action != null && !ra.Action.IsDeleted)
-                .Select(ra => new { ra.RiskId, ra.Action!.Notes })
-                .ToListAsync(cancellationToken);
+            var mitigationNotesByRisk = await RaidRiskMitigations.LoadLinksForRiskIdsAsync(
+                _db, riskIds, cancellationToken);
 
             foreach (var risk in risks)
             {
@@ -1768,6 +1763,7 @@ public partial class ModernRaidController
                 break;
             case "statusid":
                 risk.RiskStatusId = intVal;
+                await RaidRiskClosure.SyncClosedDateFromStatusIdAsync(_db, risk, ct);
                 break;
             case "priorityid":
                 risk.RiskPriorityId = intVal;
@@ -1865,6 +1861,10 @@ public partial class ModernRaidController
         }
 
         await RecalculateRiskScores(risk, ct);
+        var ratingField = field is "residualimpactid" or "residuallikelihoodid"
+            or "toleranceimpactid" or "tolerancelikelihoodid";
+        if (ratingField && RaidRiskScoreRules.ResidualExceedsTolerance(risk.ResidualScore, risk.ToleranceScore))
+            return BadRequest(new { error = RaidRiskScoreRules.ResidualAboveToleranceMessage });
 
         risk.UpdatedAt = DateTime.UtcNow;
         risk.UpdatedByUserId = userId;
@@ -2106,14 +2106,8 @@ public partial class ModernRaidController
             .FirstOrDefaultAsync(r => r.Id == riskId && !r.IsDeleted, ct);
         if (risk == null) return NotFound(new { error = "Risk not found" });
 
-        var links = await _db.RiskActions.AsNoTracking()
-            .Include(ra => ra.Action!).ThenInclude(a => a.AssignedToUser)
-            .Where(ra => ra.RiskId == riskId && ra.Action != null && !ra.Action.IsDeleted)
-            .OrderBy(ra => ra.Action!.DueDate ?? DateTime.MaxValue)
-            .ThenBy(ra => ra.Action!.Id)
-            .ToListAsync(ct);
-
-        var mitigations = links.Select(ra => MapMitigationApiItem(ra.Action!)).ToList();
+        var actions = await RaidRiskMitigations.LoadForRiskAsync(_db, riskId, ct);
+        var mitigations = actions.Select(a => MapMitigationApiItem(a)).ToList();
 
         return Json(new { riskId, reference = $"R-{riskId:D4}", title = risk.Title, count = mitigations.Count, mitigations });
     }
@@ -2176,8 +2170,7 @@ public partial class ModernRaidController
         risk.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
-        var count = await _db.RiskActions.CountAsync(ra =>
-            ra.RiskId == riskId && ra.Action != null && !ra.Action.IsDeleted, ct);
+        var count = await RaidRiskMitigations.CountForRiskAsync(_db, riskId, ct);
 
         return Json(new
         {
@@ -2204,14 +2197,11 @@ public partial class ModernRaidController
         if (!userId.HasValue)
             return Unauthorized(new { error = "Not signed in" });
 
-        var linked = await _db.RiskActions
-            .Include(ra => ra.Action!)
-            .ThenInclude(a => a.AssignedToUser)
-            .FirstOrDefaultAsync(ra => ra.RiskId == riskId && ra.ActionId == actionId, ct);
-        if (linked?.Action == null || linked.Action.IsDeleted)
+        var mitigationAction = await RaidRiskMitigations.FindForRiskAsync(
+            _db, riskId, actionId, tracking: true, ct);
+        if (mitigationAction == null)
             return NotFound(new { error = "Mitigation not found" });
 
-        var mitigationAction = linked.Action;
         var title = RaidFieldLimits.NormalizeNarrative(req.Title) ?? "";
         var normalizedStatus = NormalizeMitigationInputStatus(req.Status);
         if (string.IsNullOrWhiteSpace(title))
@@ -2244,6 +2234,8 @@ public partial class ModernRaidController
         {
             mitigationAction.Notes = AppendMitigationAuditLine(mitigationAction.Notes, note);
         }
+
+        await RaidRiskMitigations.EnsureJunctionAsync(_db, riskId, actionId, ct);
 
         var risk = await _db.Risks.FirstOrDefaultAsync(r => r.Id == riskId && !r.IsDeleted, ct);
         if (risk != null)

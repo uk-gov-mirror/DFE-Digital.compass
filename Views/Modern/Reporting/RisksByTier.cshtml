@@ -351,81 +351,6 @@
       cursor: pointer;
       color: #1d70b8;
     }
-    .rbt-rating-trend {
-      border-left: 4px solid #505a5f;
-      padding: 0.75rem 0 0.75rem 1rem;
-      margin-bottom: 1.5rem;
-    }
-    .rbt-rating-trend--worsening { border-left-color: #d4351c; }
-    .rbt-rating-trend--improving { border-left-color: #00703c; }
-    .rbt-rating-trend--mixed { border-left-color: #f47738; }
-    .rbt-rating-band {
-      border-top: 1px solid #b1b4b6;
-      padding-top: 1rem;
-      margin-bottom: 1.25rem;
-    }
-    .rbt-rating-band:first-of-type {
-      border-top: none;
-      padding-top: 0;
-    }
-    .rbt-rating-band__header {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 0.5rem 1rem;
-      margin-bottom: 0.75rem;
-    }
-    .rbt-rating-band__title {
-      margin: 0;
-      font-size: 1.125rem;
-    }
-    .rbt-rating-band__summary {
-      margin: 0 0 0.75rem;
-      color: #505a5f;
-    }
-    .rbt-rating-scale {
-      margin-bottom: 0.75rem;
-    }
-    .rbt-rating-scale:last-child {
-      margin-bottom: 0;
-    }
-    .rbt-rating-scale__label {
-      display: block;
-      font-size: 0.875rem;
-      font-weight: 700;
-      margin-bottom: 0.35rem;
-    }
-    .rbt-rating-scale__tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-    }
-    .rbt-rating-scale__tag {
-      display: inline-block;
-      padding: 0.2rem 0.55rem;
-      font-size: 0.8125rem;
-      line-height: 1.3;
-      background: #f3f2f1;
-      color: #505a5f;
-      border-radius: 2px;
-    }
-    .rbt-rating-scale__tag--active {
-      background: #1d70b8;
-      color: #fff;
-      font-weight: 700;
-    }
-    .mr-reporting-modal__footer {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.75rem 1rem;
-    }
-    .rbt-risk-modal-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
     .mr-ba-table__group--tier {
       background: #f0f4f8;
       border-bottom: 3px solid #1d70b8;
@@ -436,5 +361,6 @@
 @section Scripts {
   <script type="application/json" id="rbt-drilldown-config">@Html.Raw(drillConfigJson)</script>
   <script src="@Url.Content("~/modern/js/reporting-table-controls.js")" asp-append-version="true" nonce="@Context.Items["Nonce"]"></script>
+  <script src="@Url.Content("~/js/raid-risk-info-modal.js")" asp-append-version="true" nonce="@Context.Items["Nonce"]"></script>
   <script src="@Url.Content("~/modern/js/risks-by-tier-report.js")" asp-append-version="true" nonce="@Context.Items["Nonce"]"></script>
 }

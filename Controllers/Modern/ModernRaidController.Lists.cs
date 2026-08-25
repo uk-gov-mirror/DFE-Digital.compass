@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Compass.Models;
+using Compass.Services.Raid;
 using Compass.ViewModels.Modern;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -38,7 +39,7 @@ public partial class ModernRaidController
     }
 
     /// <summary>Risks where the viewer is owner, SRO, legacy owner email, or assigned to any mitigation action.</summary>
-    private static IQueryable<Risk> WhereRiskIsMine(IQueryable<Risk> query, int? userId, string emailLower)
+    private IQueryable<Risk> WhereRiskIsMine(IQueryable<Risk> query, int? userId, string emailLower)
     {
         if (!userId.HasValue && string.IsNullOrEmpty(emailLower))
             return query.Where(_ => false);
@@ -50,7 +51,42 @@ public partial class ModernRaidController
             r.RiskActions.Any(ra =>
                 !ra.Action.IsDeleted &&
                 ((userId.HasValue && ra.Action.AssignedToUserId == userId) ||
-                 (ra.Action.AssignedToEmail != null && ra.Action.AssignedToEmail.ToLower() == emailLower))));
+                 (ra.Action.AssignedToEmail != null && ra.Action.AssignedToEmail.ToLower() == emailLower))) ||
+            _db.Actions.Any(a =>
+                !a.IsDeleted
+                && a.RiskId == r.Id
+                && ((userId.HasValue && a.AssignedToUserId == userId) ||
+                    (a.AssignedToEmail != null && a.AssignedToEmail.ToLower() == emailLower))));
+    }
+
+    private static IQueryable<Risk> ApplyRiskRegisterSearch(IQueryable<Risk> query, string? search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+            return query;
+
+        var t = search.Trim();
+        int? numericId = null;
+        var refText = t;
+        if (refText.StartsWith("R-", StringComparison.OrdinalIgnoreCase))
+            refText = refText[2..];
+        if (int.TryParse(refText, out var parsed) && parsed > 0)
+            numericId = parsed;
+
+        return query.Where(r =>
+            r.Title.Contains(t) ||
+            (r.Description != null && r.Description.Contains(t)) ||
+            (r.Notes != null && r.Notes.Contains(t)) ||
+            (r.Cause != null && r.Cause.Contains(t)) ||
+            (r.ResponseStrategy != null && r.ResponseStrategy.Contains(t)) ||
+            (r.OwnerEmail != null && r.OwnerEmail.Contains(t)) ||
+            (r.OwnerUser != null && (
+                (r.OwnerUser.Name != null && r.OwnerUser.Name.Contains(t)) ||
+                (r.OwnerUser.Email != null && r.OwnerUser.Email.Contains(t)))) ||
+            (r.PrimaryProduct != null && (
+                (r.PrimaryProduct.DisplayName != null && r.PrimaryProduct.DisplayName.Contains(t)) ||
+                r.PrimaryProduct.FipsId.Contains(t))) ||
+            (r.Project != null && r.Project.Title.Contains(t)) ||
+            (numericId.HasValue && r.Id == numericId.Value));
     }
 
     private static IReadOnlyList<int> MergeRaidRegisterFilterIds(int? singleId, int[]? arrayIds)
@@ -245,17 +281,11 @@ public partial class ModernRaidController
             qBase = WhereRiskMatchesAnyBusinessArea(qBase, businessAreaFilterIds);
 
         if (!string.IsNullOrWhiteSpace(search))
-        {
-            var t = search.Trim();
-            qBase = qBase.Where(r =>
-                r.Title.Contains(t) ||
-                (r.Description != null && r.Description.Contains(t)) ||
-                (r.Notes != null && r.Notes.Contains(t)));
-        }
+            qBase = ApplyRiskRegisterSearch(qBase, search);
 
         var myCount = await WhereRiskIsMine(qBase, currentUserId, emailLower).CountAsync(cancellationToken);
 
-        var stripOpenRisk = qBase.Where(r => r.ClosedDate == null);
+        var stripOpenRisk = RaidRiskClosure.WhereOpen(qBase);
         var registerStripOpenRiskCount = await stripOpenRisk.CountAsync(cancellationToken);
         var registerStripOpenCrisisCriticalRiskCount =
             await stripOpenRisk.CountAsync(r => r.RiskScore >= 16);
@@ -283,14 +313,14 @@ public partial class ModernRaidController
             riskEscalationLabels.Count(RaidLooksEscalated) + issueEscalationLabels.Count(RaidLooksEscalated);
 
         var allCount = await qBase.CountAsync(cancellationToken);
-        var openCount = await qBase.Where(r => r.ClosedDate == null).CountAsync(cancellationToken);
-        var closedCount = await qBase.Where(r => r.ClosedDate != null).CountAsync(cancellationToken);
+        var openCount = await RaidRiskClosure.WhereOpen(qBase).CountAsync(cancellationToken);
+        var closedCount = await RaidRiskClosure.WhereClosed(qBase).CountAsync(cancellationToken);
 
         IQueryable<Risk> q = activeTab switch
         {
             "my" => WhereRiskIsMine(qBase, currentUserId, emailLower),
-            "open" => qBase.Where(r => r.ClosedDate == null),
-            "closed" => qBase.Where(r => r.ClosedDate != null),
+            "open" => RaidRiskClosure.WhereOpen(qBase),
+            "closed" => RaidRiskClosure.WhereClosed(qBase),
             _ => qBase
         };
 
@@ -331,7 +361,7 @@ public partial class ModernRaidController
                 r.RiskScore,
                 r.RiskTier?.Name,
                 Snippet(r.Description, 8000),
-                r.ClosedDate.HasValue));
+                RaidRiskClosure.IsClosed(r)));
         }
 
         var statusRaw = await _db.RiskStatuses.AsNoTracking()
