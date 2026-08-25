@@ -13,6 +13,8 @@
   var serverTableLayouts = {};
   var readOnly = false;
   var canEditLockedInherentRatings = false;
+  var riskInfoCache = {};
+  var riskInfoDirectorate = '—';
 
   function readCsrfToken() {
     var tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
@@ -47,6 +49,7 @@
     serverTableLayouts = config.tableLayouts || {};
     readOnly = !!config.readOnly;
     canEditLockedInherentRatings = !!config.canEditLockedInherentRatings;
+    initRiskInfoModal(config.riskInfo || {});
 
     bindCellClicks();
     bindInlineAdd();
@@ -81,6 +84,7 @@
     bindZoomControls();
     bindResetTableModal();
     bindClearFiltersButtons();
+    bindTableSearch();
     restoreTableZoom();
     syncAllHeaderScrollMetrics();
     window.addEventListener('resize', syncAllHeaderScrollMetrics);
@@ -377,6 +381,8 @@
       }
     });
 
+    var searchQ = getTableSearchQuery(table);
+
     table.querySelectorAll('tbody .raid-ss-row').forEach(function (row) {
       var show = true;
       Object.keys(filtersForTable).forEach(function (colIdx) {
@@ -391,7 +397,43 @@
         var text = getCellFilterText(cell).toLowerCase();
         if (text.indexOf(textFiltersForTable[colIdx]) === -1) show = false;
       });
+      if (show && searchQ && !rowMatchesTableSearch(row, table, searchQ)) show = false;
       row.style.display = show ? '' : 'none';
+    });
+  }
+
+  function getTableSearchQuery(table) {
+    var input = document.querySelector('[data-raid-ss-search="' + table.id + '"]');
+    return input ? input.value.trim().toLowerCase() : '';
+  }
+
+  var TABLE_SEARCH_COLUMNS = ['title', 'owner', 'description'];
+
+  function rowMatchesTableSearch(row, table, searchQ) {
+    var headerRow = table.querySelector('.raid-ss-header-row');
+    if (!headerRow) return true;
+    var headers = Array.from(headerRow.children);
+    return TABLE_SEARCH_COLUMNS.some(function (colName) {
+      var idx = headers.findIndex(function (th) { return th.getAttribute('data-col') === colName; });
+      if (idx < 0) return false;
+      var cell = row.children[idx];
+      if (!cell) return false;
+      return getCellFilterText(cell).toLowerCase().indexOf(searchQ) !== -1;
+    });
+  }
+
+  function bindTableSearch() {
+    document.querySelectorAll('[data-raid-ss-search]').forEach(function (input) {
+      var debounceTimer = null;
+      input.addEventListener('input', function () {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+          var table = document.getElementById(input.getAttribute('data-raid-ss-search'));
+          if (!table) return;
+          applyFilters(table);
+          updateClearFilterBtn(table);
+        }, 200);
+      });
     });
   }
 
@@ -400,7 +442,7 @@
       return activeFilters[k].tableId === table.id;
     }) || Object.keys(textFilters).some(function (k) {
       return textFilters[k].tableId === table.id;
-    });
+    }) || !!getTableSearchQuery(table);
     var section = table.closest('.raid-ss-tab-panel') || table.closest('[id^="ss-panel-"]');
     if (section) {
       var btn = section.querySelector('.raid-ss-clear-filters-btn');
@@ -412,6 +454,9 @@
     activeFilters = {};
     textFilters = {};
     document.querySelectorAll('.raid-ss-title-filter').forEach(function (inp) {
+      inp.value = '';
+    });
+    document.querySelectorAll('[data-raid-ss-search]').forEach(function (inp) {
       inp.value = '';
     });
     document.querySelectorAll('.raid-ss-filter-toggle').forEach(function (btn) {
@@ -794,8 +839,10 @@
       body: JSON.stringify({ field: field, value: value })
     })
     .then(function (res) {
-      if (!res.ok) throw new Error('Save failed: ' + res.status);
-      return res.json();
+      return parseJsonResponse(res).then(function (data) {
+        if (!res.ok) throw new Error((data && data.error) || ('Save failed (' + res.status + ')'));
+        return data;
+      });
     })
     .then(function (data) {
       row.classList.remove('raid-ss-saving');
@@ -813,6 +860,7 @@
       row.classList.add('raid-ss-error');
       setTimeout(function () { row.classList.remove('raid-ss-error'); }, 600);
       console.error('RAID save error:', err);
+      alert(err.message || 'Could not save.');
       if (onError) onError(err);
     });
   }
@@ -864,6 +912,7 @@
   }
 
   function onRegisterItemCreated(entityType, data) {
+    if (entityType === 'risk') upsertRiskInfoFromSpreadsheetRow(data);
     var totalKey = entityType === 'risk' ? 'total-risks'
       : entityType === 'issue' ? 'total-issues'
         : entityType === 'nearmiss' ? 'total-nearmisses'
@@ -1310,6 +1359,29 @@
       if (s.indexOf('3') !== -1 || s.indexOf('tier three') !== -1 || s === 't3') return base + ' dfe-f-badge--red';
       if (s.indexOf('2') !== -1 || s.indexOf('tier two') !== -1 || s === 't2') return base + ' dfe-f-badge--orange';
       if (s.indexOf('1') !== -1 || s.indexOf('tier one') !== -1 || s === 't1') return base + ' dfe-f-badge--blue';
+      return base + ' dfe-f-badge--grey';
+    }
+    if (kind === 'likelihoodImpact') {
+      if (/^\d+$/.test(s)) {
+        var n = parseInt(s, 10);
+        if (n <= 0) return base + ' dfe-f-badge--grey';
+        if (n <= 2) return base + ' dfe-f-badge--green';
+        if (n === 3) return base + ' dfe-f-badge--orange';
+        return base + ' dfe-f-badge--red';
+      }
+      if (s === 'very low' || s === 'negligible' || s === 'rare' || s === 'minimal'
+          || s.indexOf('very low') !== -1 || s.indexOf('very small') !== -1 || s.indexOf('negligible') !== -1 || s.indexOf('rare') !== -1
+          || s === 'low' || s === 'small' || s === 'minor' || s === 'unlikely') {
+        return base + ' dfe-f-badge--green';
+      }
+      if (s.indexOf('medium') !== -1 || s.indexOf('moderate') !== -1 || s.indexOf('possible') !== -1) {
+        return base + ' dfe-f-badge--orange';
+      }
+      if (s.indexOf('very high') !== -1 || s.indexOf('certain') !== -1 || s.indexOf('severe') !== -1
+          || s.indexOf('catastrophic') !== -1 || s.indexOf('high') !== -1 || s.indexOf('major') !== -1
+          || s.indexOf('likely') !== -1 || s.indexOf('critical') !== -1) {
+        return base + ' dfe-f-badge--red';
+      }
       return base + ' dfe-f-badge--grey';
     }
     return base + ' dfe-f-badge--grey';
@@ -1840,38 +1912,43 @@
       if (th.classList.contains('raid-ss-group-start')) td.classList.add('raid-ss-group-start');
       if (isInherentRatingLocked('originalImpactId', data.originalImpactId)) {
         td.setAttribute('data-inherent-locked', 'true');
-        appendValSpan(td, data.originalImpact || '—');
+        td.classList.add('raid-ss-badge-cell');
+        td.setAttribute('data-badge-kind', 'likelihoodImpact');
+        appendBadgeValSpan(td, data.originalImpact || '—', 'likelihoodImpact');
       } else {
-        appendSelectCell(td, 'originalImpactId', 'riskImpactLevels', data.originalImpactId, data.originalImpact);
+        appendSelectCell(td, 'originalImpactId', 'riskImpactLevels', data.originalImpactId, data.originalImpact, 'likelihoodImpact');
       }
     } else if (col === 'origLikelihood') {
       if (isInherentRatingLocked('originalLikelihoodId', data.originalLikelihoodId)) {
         td.setAttribute('data-inherent-locked', 'true');
-        appendValSpan(td, data.originalLikelihood || '—');
+        td.classList.add('raid-ss-badge-cell');
+        td.setAttribute('data-badge-kind', 'likelihoodImpact');
+        appendBadgeValSpan(td, data.originalLikelihood || '—', 'likelihoodImpact');
       } else {
-        appendSelectCell(td, 'originalLikelihoodId', 'riskLikelihoods', data.originalLikelihoodId, data.originalLikelihood);
+        appendSelectCell(td, 'originalLikelihoodId', 'riskLikelihoods', data.originalLikelihoodId, data.originalLikelihood, 'likelihoodImpact');
       }
     } else if (col === 'origScore') {
       appendScoreCell(td, RISK_SCORE_COLS.origScore, data.inherentScore, th);
     } else if (col === 'currImpact') {
       if (th.classList.contains('raid-ss-group-start')) td.classList.add('raid-ss-group-start');
-      appendSelectCell(td, 'currentImpactId', 'riskImpactLevels', data.currentImpactId, data.currentImpact);
+      appendSelectCell(td, 'currentImpactId', 'riskImpactLevels', data.currentImpactId, data.currentImpact, 'likelihoodImpact');
     } else if (col === 'currLikelihood') {
-      appendSelectCell(td, 'currentLikelihoodId', 'riskLikelihoods', data.currentLikelihoodId, data.currentLikelihood);
+      appendSelectCell(td, 'currentLikelihoodId', 'riskLikelihoods', data.currentLikelihoodId, data.currentLikelihood, 'likelihoodImpact');
     } else if (col === 'currScore') {
       appendScoreCell(td, RISK_SCORE_COLS.currScore, data.currentScore, th);
     } else if (col === 'residImpact') {
       if (th.classList.contains('raid-ss-group-start')) td.classList.add('raid-ss-group-start');
-      appendSelectCell(td, 'residualImpactId', 'riskImpactLevels', data.residualImpactId, data.residualImpact);
+      appendSelectCell(td, 'residualImpactId', 'riskImpactLevels', data.residualImpactId, data.residualImpact, 'likelihoodImpact');
     } else if (col === 'residLikelihood') {
-      appendSelectCell(td, 'residualLikelihoodId', 'riskLikelihoods', data.residualLikelihoodId, data.residualLikelihood);
+      appendSelectCell(td, 'residualLikelihoodId', 'riskLikelihoods', data.residualLikelihoodId, data.residualLikelihood, 'likelihoodImpact');
     } else if (col === 'residScore') {
       appendScoreCell(td, RISK_SCORE_COLS.residScore, data.residualScore, th);
     } else if (col === 'tolImpact') {
       if (th.classList.contains('raid-ss-group-start')) td.classList.add('raid-ss-group-start');
-      appendSelectCell(td, 'toleranceImpactId', 'riskImpactLevels', data.toleranceImpactId, data.toleranceImpact);
+      td.setAttribute('data-score-edge-for', RISK_SCORE_COLS.tolScore);
+      appendSelectCell(td, 'toleranceImpactId', 'riskImpactLevels', data.toleranceImpactId, data.toleranceImpact, 'likelihoodImpact');
     } else if (col === 'tolLikelihood') {
-      appendSelectCell(td, 'toleranceLikelihoodId', 'riskLikelihoods', data.toleranceLikelihoodId, data.toleranceLikelihood);
+      appendSelectCell(td, 'toleranceLikelihoodId', 'riskLikelihoods', data.toleranceLikelihoodId, data.toleranceLikelihood, 'likelihoodImpact');
     } else if (col === 'tolScore') {
       appendScoreCell(td, RISK_SCORE_COLS.tolScore, data.toleranceScore, th);
     } else if (col === 'proximity') {
@@ -1997,6 +2074,14 @@
       }
       tr.appendChild(td);
     });
+
+    if (entityType === 'risk') {
+      applyRefScoreIndicator(tr, data.currentScore);
+      ['inherentScore', 'currentScore', 'residualScore', 'toleranceScore'].forEach(function (field) {
+        var scoreCell = tr.querySelector('[data-score-field="' + field + '"]');
+        if (scoreCell) renderScoreBadgeCell(scoreCell, data[field]);
+      });
+    }
 
     if (wrapEnabled) {
       applyWrapState();
@@ -2285,42 +2370,229 @@
 
   // ── Reference link modal ──
 
+  function initRiskInfoModal(riskInfo) {
+    riskInfoCache = riskInfo.risksById || {};
+    riskInfoDirectorate = riskInfo.directorate || '—';
+    if (window.RaidRiskInfoModal) {
+      window.RaidRiskInfoModal.init({
+        likelihoodScale: riskInfo.likelihoodScale || [],
+        impactScale: riskInfo.impactScale || [],
+        canActionTierChanges: false
+      });
+    }
+  }
+
+  function pairText(likelihood, impact) {
+    var lik = likelihood && likelihood !== '—' ? likelihood : '—';
+    var imp = impact && impact !== '—' ? impact : '—';
+    if (lik === '—' && imp === '—') return '—';
+    return lik + ' × ' + imp;
+  }
+
+  function ratingBandFromLabels(score, likelihood, impact) {
+    return {
+      score: score == null ? null : score,
+      likelihoodLabel: likelihood && likelihood !== '—' ? likelihood : '—',
+      impactLabel: impact && impact !== '—' ? impact : '—',
+      likelihoodIndex: 0,
+      impactIndex: 0
+    };
+  }
+
+  function relationLabelFromApi(data) {
+    var rel = data && data.relation ? data.relation : {};
+    if (rel.relationKind === 'Organisation') return 'Organisation';
+    return rel.relationTarget || '—';
+  }
+
+  function upsertRiskInfoFromSpreadsheetRow(data) {
+    if (!data || data.id == null) return;
+    var inherent = ratingBandFromLabels(data.inherentScore, data.originalLikelihood, data.originalImpact);
+    var current = ratingBandFromLabels(data.currentScore, data.currentLikelihood, data.currentImpact);
+    var residual = ratingBandFromLabels(data.residualScore, data.residualLikelihood, data.residualImpact);
+    var payload = {
+      id: data.id,
+      reference: data.reference || '',
+      title: data.title || '',
+      detailUrl: '/modern/raid/risks/' + data.id,
+      isClosed: !!(data.closedDate),
+      inherentScore: data.inherentScore,
+      currentScore: data.currentScore,
+      residualScore: data.residualScore,
+      inherent: inherent,
+      current: current,
+      residual: residual,
+      inherentLikelihoodImpact: pairText(data.originalLikelihood, data.originalImpact),
+      currentLikelihoodImpact: pairText(data.currentLikelihood, data.currentImpact),
+      residualLikelihoodImpact: pairText(data.residualLikelihood, data.residualImpact),
+      mitigation: data.responseStrategy || data.response || '',
+      mitigationFull: data.responseStrategy || data.response || '',
+      description: data.description || '',
+      status: data.status || '—',
+      tierName: data.tier || 'Not set',
+      owner: data.owner || '—',
+      lastReviewedAt: data.lastReviewDate || null,
+      lastUpdatedAt: data.updatedAtIso || data.updatedAt || null,
+      createdAt: data.createdAt || null,
+      daysSinceLastUpdate: 0,
+      workItemOrProject: relationLabelFromApi(data),
+      workItemUrl: (data.relation && data.relation.relationLinkHref) || null,
+      directorate: riskInfoDirectorate
+    };
+    riskInfoCache[data.id] = payload;
+    riskInfoCache[String(data.id)] = payload;
+  }
+
+  function cellByCol(row, col) {
+    var table = row.closest('table');
+    if (!table) return null;
+    var headers = table.querySelectorAll('thead .raid-ss-header-row th');
+    var idx = -1;
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i].getAttribute('data-col') === col) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 0) return null;
+    return row.children[idx] || null;
+  }
+
+  function parseScoreCell(text) {
+    if (!text || text === '—') return null;
+    var m = String(text).match(/(\d+(?:\.\d+)?)/);
+    if (!m) return null;
+    var n = Number(m[1]);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function overlayRiskFromRow(base, row, href) {
+    var risk = Object.assign({}, base);
+    if (base.inherent) risk.inherent = Object.assign({}, base.inherent);
+    if (base.current) risk.current = Object.assign({}, base.current);
+    if (base.residual) risk.residual = Object.assign({}, base.residual);
+
+    function txt(col) {
+      return getCellFilterText(cellByCol(row, col));
+    }
+
+    function applyText(key, col, fallbackDash) {
+      var value = txt(col);
+      if (value && value !== '—') risk[key] = value;
+      else if (!risk[key] && fallbackDash) risk[key] = '—';
+    }
+
+    applyText('title', 'title');
+    applyText('status', 'status');
+    applyText('tierName', 'tier');
+    applyText('owner', 'owner');
+    applyText('description', 'description');
+    applyText('workItemOrProject', 'relation');
+
+    var response = txt('response');
+    if (response && response !== '—') {
+      risk.mitigation = response;
+      risk.mitigationFull = response;
+    }
+
+    function overlayBand(prefix, bandKey, pairKey, scoreKey) {
+      var lik = txt(prefix + 'Likelihood');
+      var imp = txt(prefix + 'Impact');
+      var score = parseScoreCell(txt(prefix + 'Score'));
+      if ((!lik || lik === '—') && (!imp || imp === '—') && score == null) return;
+      var band = Object.assign({}, risk[bandKey] || ratingBandFromLabels(null, null, null));
+      if (lik && lik !== '—') band.likelihoodLabel = lik;
+      if (imp && imp !== '—') band.impactLabel = imp;
+      if (score != null) {
+        band.score = score;
+        risk[scoreKey] = score;
+      }
+      band.likelihoodIndex = 0;
+      band.impactIndex = 0;
+      risk[bandKey] = band;
+      if ((lik && lik !== '—') || (imp && imp !== '—')) {
+        risk[pairKey] = pairText(band.likelihoodLabel, band.impactLabel);
+      }
+    }
+
+    overlayBand('orig', 'inherent', 'inherentLikelihoodImpact', 'inherentScore');
+    overlayBand('curr', 'current', 'currentLikelihoodImpact', 'currentScore');
+    overlayBand('resid', 'residual', 'residualLikelihoodImpact', 'residualScore');
+
+    if (href) risk.detailUrl = href;
+    if (!risk.directorate) risk.directorate = riskInfoDirectorate;
+    if (!risk.reference) {
+      var refLink = row.querySelector('.raid-ss-ref-link');
+      risk.reference = refLink ? refLink.textContent.trim() : '';
+    }
+    if (!risk.tierName) risk.tierName = 'Not set';
+    return risk;
+  }
+
+  function openRiskInfoFromRef(link, row) {
+    var id = row.getAttribute('data-id');
+    var href = link.getAttribute('data-href') || ('/modern/raid/risks/' + id);
+    var cached = riskInfoCache[id] || riskInfoCache[String(id)] || {
+      id: id,
+      reference: link.textContent.trim(),
+      title: '',
+      detailUrl: href,
+      directorate: riskInfoDirectorate,
+      workItemOrProject: '—',
+      status: '—',
+      tierName: 'Not set',
+      owner: '—'
+    };
+    var risk = overlayRiskFromRow(cached, row, href);
+    riskInfoCache[id] = risk;
+    riskInfoCache[String(id)] = risk;
+    window.RaidRiskInfoModal.open(risk);
+  }
+
+  function showRefNewTabModal(href, ref) {
+    var modal = document.getElementById('raid-ref-modal');
+    if (!modal) return;
+
+    document.getElementById('raid-ref-modal-text').textContent =
+      'Open ' + ref + ' in a new tab to view the full details?';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    var yesBtn = document.getElementById('raid-ref-modal-yes');
+    var noBtn = document.getElementById('raid-ref-modal-no');
+    var closeBtn = modal.querySelector('.raid-modal-close');
+
+    function cleanup() {
+      yesBtn.replaceWith(yesBtn.cloneNode(true));
+      noBtn.replaceWith(noBtn.cloneNode(true));
+      closeBtn.replaceWith(closeBtn.cloneNode(true));
+      modal.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    yesBtn.addEventListener('click', function () {
+      window.open(href, '_blank');
+      cleanup();
+    }, { once: true });
+
+    noBtn.addEventListener('click', function () { cleanup(); }, { once: true });
+    closeBtn.addEventListener('click', function () { cleanup(); }, { once: true });
+  }
+
   function bindRefLinks() {
     document.addEventListener('click', function (e) {
       var link = e.target.closest('.raid-ss-ref-link');
       if (!link) return;
       e.preventDefault();
 
-      var href = link.getAttribute('data-href');
-      var ref = link.textContent.trim();
-
-      var modal = document.getElementById('raid-ref-modal');
-      if (!modal) return;
-
-      document.getElementById('raid-ref-modal-text').textContent =
-        'Open ' + ref + ' in a new tab to view the full details?';
-      modal.style.display = 'flex';
-      document.body.style.overflow = 'hidden';
-
-      var yesBtn = document.getElementById('raid-ref-modal-yes');
-      var noBtn = document.getElementById('raid-ref-modal-no');
-      var closeBtn = modal.querySelector('.raid-modal-close');
-
-      function cleanup() {
-        yesBtn.replaceWith(yesBtn.cloneNode(true));
-        noBtn.replaceWith(noBtn.cloneNode(true));
-        closeBtn.replaceWith(closeBtn.cloneNode(true));
-        modal.style.display = 'none';
-        document.body.style.overflow = '';
+      var row = link.closest('tr.raid-ss-row');
+      var entity = row ? row.getAttribute('data-entity') : '';
+      if (entity === 'risk' && window.RaidRiskInfoModal) {
+        openRiskInfoFromRef(link, row);
+        return;
       }
 
-      yesBtn.addEventListener('click', function () {
-        window.open(href, '_blank');
-        cleanup();
-      }, { once: true });
-
-      noBtn.addEventListener('click', function () { cleanup(); }, { once: true });
-      closeBtn.addEventListener('click', function () { cleanup(); }, { once: true });
+      showRefNewTabModal(link.getAttribute('data-href'), link.textContent.trim());
     });
   }
 
@@ -2462,18 +2734,40 @@
     return 'raid-ss-score-badge--lower';
   }
 
-  function riskRefScoreIndicatorClass(score) {
+  function riskScoreEdgeClass(score) {
     if (score == null || score === '' || isNaN(score)) return '';
     var s = parseFloat(score);
-    if (s >= 20) return 'raid-ss-ref-score--highest';
-    if (s >= 15) return 'raid-ss-ref-score--elevated';
-    if (s >= 8) return 'raid-ss-ref-score--medium';
-    return 'raid-ss-ref-score--lower';
+    if (s >= 20) return 'raid-ss-score-edge--highest';
+    if (s >= 15) return 'raid-ss-score-edge--elevated';
+    if (s >= 8) return 'raid-ss-score-edge--medium';
+    return 'raid-ss-score-edge--lower';
+  }
+
+  var SCORE_EDGE_CLASSES = [
+    'raid-ss-score-edge--highest',
+    'raid-ss-score-edge--elevated',
+    'raid-ss-score-edge--medium',
+    'raid-ss-score-edge--lower'
+  ];
+
+  function applyScoreEdgeClass(el, score) {
+    if (!el) return;
+    SCORE_EDGE_CLASSES.forEach(function (cls) { el.classList.remove(cls); });
+    var cls = riskScoreEdgeClass(score);
+    if (cls) el.classList.add(cls);
   }
 
   function renderScoreBadgeCell(cell, score) {
     if (!cell) return;
     cell.innerHTML = '';
+    applyScoreEdgeClass(cell, score);
+    var field = cell.getAttribute('data-score-field');
+    var row = cell.closest('tr');
+    if (field && row) {
+      row.querySelectorAll('[data-score-edge-for="' + field + '"]').forEach(function (el) {
+        applyScoreEdgeClass(el, score);
+      });
+    }
     if (score == null || score === '' || isNaN(parseFloat(score))) {
       var dash = document.createElement('span');
       dash.className = 'dfe-c-text-muted';
@@ -2490,15 +2784,7 @@
 
   function applyRefScoreIndicator(row, currentScore) {
     var refCell = row.querySelector('.raid-ss-sticky-col');
-    if (!refCell) return;
-    refCell.classList.remove(
-      'raid-ss-ref-score--highest',
-      'raid-ss-ref-score--elevated',
-      'raid-ss-ref-score--medium',
-      'raid-ss-ref-score--lower'
-    );
-    var cls = riskRefScoreIndicatorClass(currentScore);
-    if (cls) refCell.classList.add(cls);
+    applyScoreEdgeClass(refCell, currentScore);
   }
 
   function setupColumnResize() {

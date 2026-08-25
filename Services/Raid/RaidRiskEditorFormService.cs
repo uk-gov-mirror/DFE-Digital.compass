@@ -152,6 +152,11 @@ public sealed class RaidRiskEditorFormService(CompassDbContext db) : IRaidRiskEd
 
         var residualScore = await ComputeRaidRiskScoreDecimalAsync(form.ResidualLikelihoodId, form.ResidualImpactLevelId, cancellationToken);
         var toleranceScore = await ComputeRaidRiskScoreDecimalAsync(form.ToleranceLikelihoodId, form.ToleranceImpactLevelId, cancellationToken);
+        if (RaidRiskScoreRules.ResidualExceedsTolerance(residualScore, toleranceScore))
+        {
+            RaidRiskScoreRules.AddResidualAboveToleranceError(modelState);
+            return null;
+        }
         var currentLikelihoodId = form.CurrentLikelihoodId ?? form.RiskLikelihoodId;
         var currentImpactLevelId = form.CurrentImpactLevelId ?? form.RiskImpactLevelId;
         var currentScore = await ComputeRaidRiskScoreDecimalAsync(currentLikelihoodId, currentImpactLevelId, cancellationToken);
