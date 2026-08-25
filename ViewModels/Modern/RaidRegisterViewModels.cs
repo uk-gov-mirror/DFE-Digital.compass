@@ -209,6 +209,7 @@ public class RaidRegisterRiskRow
     public DateTime? NextReviewDate { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? IdentifiedDate { get; set; }
+    public DateTime? LastReviewDate { get; set; }
     public DateTime UpdatedAt { get; set; }
     public int CommentCount { get; set; }
 

@@ -275,6 +275,11 @@ public sealed class OperationsRiskEditService(
         var currentScore = await ComputeRaidRiskScoreDecimalAsync(currentLikelihoodId, currentImpactLevelId, cancellationToken);
         var residualScore = await ComputeRaidRiskScoreDecimalAsync(form.ResidualLikelihoodId, form.ResidualImpactLevelId, cancellationToken);
         var toleranceScore = await ComputeRaidRiskScoreDecimalAsync(form.ToleranceLikelihoodId, form.ToleranceImpactLevelId, cancellationToken);
+        if (RaidRiskScoreRules.ResidualExceedsTolerance(residualScore, toleranceScore))
+        {
+            RaidRiskScoreRules.AddResidualAboveToleranceError(modelState);
+            return false;
+        }
 
         var riskStatusId = form.RiskStatusId ?? await GetDefaultRaidRiskStatusIdAsync(cancellationToken);
         var riskStatusRow = riskStatusId.HasValue
@@ -320,6 +325,7 @@ public sealed class OperationsRiskEditService(
         risk.RiskScore = riskScore;
         risk.InherentScore = inherentScore;
         risk.Status = TruncateLower(riskStatusRow?.Label ?? risk.Status, 20);
+        RaidRiskClosure.SyncClosedDate(risk, riskStatusRow, DateTime.UtcNow);
         risk.Response = riskTreatment != null ? Truncate(riskTreatment.Label, 20) : null;
         var responseStrategy = RaidFieldLimits.NormalizeNarrative(form.ResponseStrategy) ?? string.Empty;
         risk.ResponseStrategy = responseStrategy;

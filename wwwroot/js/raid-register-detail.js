@@ -32,7 +32,8 @@
       registerId: config.registerId,
       tableLayouts: config.tableLayouts || {},
       readOnly: !!config.readOnly,
-      canEditLockedInherentRatings: !!config.canEditLockedInherentRatings
+      canEditLockedInherentRatings: !!config.canEditLockedInherentRatings,
+      riskInfo: config.riskInfo || {}
     });
 
     function switchView(viewName) {

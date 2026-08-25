@@ -70,11 +70,7 @@ public static class RiskCommentTimelineBuilder
             })
             .ToListAsync(cancellationToken);
 
-        var mitigations = await db.RiskActions.AsNoTracking()
-            .Include(ra => ra.Action)
-            .Where(ra => ra.RiskId == riskId && ra.Action != null && !ra.Action.IsDeleted)
-            .Select(ra => new { ra.ActionId, ra.Action!.Title, ra.Action.Notes })
-            .ToListAsync(cancellationToken);
+        var mitigations = await RaidRiskMitigations.LoadLinksForRiskAsync(db, riskId, cancellationToken);
 
         var items = new List<(DateTime SortAt, object Payload)>();
 
@@ -152,10 +148,8 @@ public static class RiskCommentTimelineBuilder
             ConsiderCandidate(bestByRisk, c.EntityId, c.CreatedAt, c.CommentText, "Comment");
         }
 
-        var mitigationNotes = await db.RiskActions.AsNoTracking()
-            .Where(ra => idList.Contains(ra.RiskId) && ra.Action != null && !ra.Action.IsDeleted)
-            .Select(ra => new { ra.RiskId, ra.Action!.Notes })
-            .ToListAsync(cancellationToken);
+        var mitigationNotes = await RaidRiskMitigations.LoadLinksForRiskIdsAsync(
+            db, idList, cancellationToken);
 
         foreach (var m in mitigationNotes)
         {
@@ -216,12 +210,9 @@ public static class RiskCommentTimelineBuilder
         var commentCount = await db.Comments.AsNoTracking()
             .CountAsync(c => c.EntityType == "Risk" && c.EntityId == riskId && !c.IsDeleted, cancellationToken);
 
-        var mitigationNotes = await db.RiskActions.AsNoTracking()
-            .Where(ra => ra.RiskId == riskId && ra.Action != null && !ra.Action.IsDeleted)
-            .Select(ra => ra.Action!.Notes)
-            .ToListAsync(cancellationToken);
+        var mitigationNotes = await RaidRiskMitigations.LoadLinksForRiskAsync(db, riskId, cancellationToken);
 
-        var mitigationLineCount = mitigationNotes.Sum(CountMitigationUpdateLines);
+        var mitigationLineCount = mitigationNotes.Sum(m => CountMitigationUpdateLines(m.Notes));
         return commentCount + mitigationLineCount;
     }
 }

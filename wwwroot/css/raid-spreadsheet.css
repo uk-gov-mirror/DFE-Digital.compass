@@ -342,20 +342,20 @@
   line-height: 1.25;
 }
 
-/* Current score indicator on ref column */
-.raid-spreadsheet-table .raid-ss-sticky-col.raid-ss-ref-score--highest {
+/* Current-score colour on the frozen Ref column only */
+.raid-spreadsheet-table .govuk-table__body .raid-ss-sticky-col.raid-ss-score-edge--highest {
   box-shadow: inset 8px 0 0 #c00;
 }
 
-.raid-spreadsheet-table .raid-ss-sticky-col.raid-ss-ref-score--elevated {
+.raid-spreadsheet-table .govuk-table__body .raid-ss-sticky-col.raid-ss-score-edge--elevated {
   box-shadow: inset 8px 0 0 #e0761e;
 }
 
-.raid-spreadsheet-table .raid-ss-sticky-col.raid-ss-ref-score--medium {
+.raid-spreadsheet-table .govuk-table__body .raid-ss-sticky-col.raid-ss-score-edge--medium {
   box-shadow: inset 8px 0 0 #f47738;
 }
 
-.raid-spreadsheet-table .raid-ss-sticky-col.raid-ss-ref-score--lower {
+.raid-spreadsheet-table .govuk-table__body .raid-ss-sticky-col.raid-ss-score-edge--lower {
   box-shadow: inset 8px 0 0 #00703c;
 }
 
@@ -407,6 +407,13 @@
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.raid-ss-global-search {
+  min-width: 14rem;
+  width: 16rem;
+  max-width: 20rem;
+  height: 40px;
 }
 
 .raid-ss-toolbar-actions .govuk-button.raid-ss-btn-icon {

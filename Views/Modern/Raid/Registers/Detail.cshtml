@@ -1,5 +1,6 @@
 @model Compass.ViewModels.Modern.RaidRegisterDetailViewModel
 @using Compass.Models
+@using System.Text.Encodings.Web
 @using System.Text.Json
 @{
   ViewData["Title"] = Model.Name;
@@ -8,12 +9,27 @@
   var readOnly = !canManage;
   var settingsUrl = Url.Action("RegisterSettings", "ModernRaid", new { id = Model.Id });
   var totalOpen = Model.OpenRiskCount + Model.OpenIssueCount + Model.OpenAssumptionCount + Model.OpenDependencyCount + Model.OpenNearMissCount;
+  var jsonOpts = new JsonSerializerOptions
+  {
+    Encoder = JavaScriptEncoder.Default,
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+  };
   var raidRegisterBootJson = JsonSerializer.Serialize(new
   {
     registerId = Model.Id,
     baseUrl = "/modern/raid",
     readOnly = readOnly,
     canEditLockedInherentRatings = Model.CanEditLockedInherentRatings,
+    riskInfo = new
+    {
+      directorate = string.IsNullOrWhiteSpace(Model.DirectorateName) ? "—" : Model.DirectorateName,
+      likelihoodScale = Model.RiskLikelihoods.Select(x => x.Name).ToList(),
+      impactScale = Model.RiskImpactLevels.Select(x => x.Name).ToList(),
+      risksById = Model.Risks.ToDictionary(
+        r => r.Id.ToString(),
+        r => RaidRegisterTableFormatting.ToRiskInfoModalPayload(
+          r, Model.DirectorateName, Model.RiskLikelihoods, Model.RiskImpactLevels))
+    },
     lookups = new
     {
       riskStatuses = Model.RiskStatuses.Select(x => new { id = x.Id, name = x.Name }),
@@ -38,7 +54,7 @@
     tableLayouts = Model.SpreadsheetColumnOrders.ToDictionary(
       kv => kv.Key,
       kv => new { columnOrder = kv.Value })
-  });
+  }, jsonOpts);
 }
 
 @section Breadcrumbs {
@@ -478,11 +494,13 @@
 
     @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_Spreadsheet_Modal.cshtml")
     @await Html.PartialAsync("~/Views/Modern/Raid/Registers/_Spreadsheet_IntroModal.cshtml")
+    @await Html.PartialAsync("~/Views/Modern/Reporting/_ReportingRiskModal.cshtml")
   </div>
 </div>
 
 @section Styles {
   <link rel="stylesheet" href="~/css/raid-spreadsheet.css" asp-append-version="true" />
+  <link rel="stylesheet" href="~/modern/css/reporting-drilldown.css" asp-append-version="true" />
   <style nonce="@cspNonce">
     @@media (min-width: 48rem) {
       .raid-register-stat-grid {
@@ -495,6 +513,7 @@
 @section Scripts {
   @Html.AntiForgeryToken()
   <script src="~/js/raid-register-detail.js" asp-append-version="true" nonce="@cspNonce"></script>
+  <script src="~/js/raid-risk-info-modal.js" asp-append-version="true" nonce="@cspNonce"></script>
   <script src="~/js/raid-spreadsheet.js" asp-append-version="true" nonce="@cspNonce"></script>
   <script src="~/js/raid-spreadsheet-intro.js" asp-append-version="true" nonce="@cspNonce"></script>
   <script type="application/json" id="raid-register-boot" nonce="@cspNonce">@Html.Raw(raidRegisterBootJson)</script>
